@@ -36,6 +36,7 @@ test("renders the finished And 1 more thing interface", async () => {
   assert.match(html, /Do przejrzenia/);
   assert.match(html, /Wszystkie myśli/);
   assert.match(html, /Załatwione/);
+  assert.match(html, /<link rel="icon" href="\/favicon\.svg" type="image\/svg\+xml"/);
   assert.doesNotMatch(html, /codex-preview|react-loading-skeleton/i);
 });
 

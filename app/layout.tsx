@@ -5,6 +5,10 @@ export const metadata: Metadata = {
   title: "And 1 more thing — spokojne miejsce na później",
   description:
     "Wyrzuć z głowy męczące myśli i wróć do nich wtedy, kiedy masz na to przestrzeń.",
+  icons: {
+    icon: [{ url: "/favicon.svg", type: "image/svg+xml" }],
+    shortcut: "/favicon.svg",
+  },
 };
 
 export default function RootLayout({
