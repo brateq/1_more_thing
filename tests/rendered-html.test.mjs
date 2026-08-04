@@ -47,7 +47,8 @@ test("supports automatic dark mode and clear capture feedback", async () => {
   ]);
 
   assert.match(styles, /prefers-color-scheme:\s*dark/);
-  assert.match(styles, /--accent:\s*#cbff4a/i);
+  assert.match(styles, /--accent:\s*#9bc5b0/i);
+  assert.match(styles, /--featured-bg:\s*#18231b/i);
   assert.match(styles, /grid-template-columns:\s*repeat\(2,/);
   assert.match(styles, /@keyframes add-confirmation/);
   assert.match(page, /Intl\.RelativeTimeFormat\("pl-PL"/);
