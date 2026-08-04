@@ -34,7 +34,7 @@ test("renders the finished And 1 more thing interface", async () => {
   assert.match(html, /Co jeszcze chodzi Ci/);
   assert.match(html, /Zostaw tutaj/);
   assert.match(html, /Do przejrzenia/);
-  assert.match(html, /Wszystkie myśli/);
+  assert.match(html, /Wszystkie/);
   assert.match(html, /Załatwione/);
   assert.match(html, /<link rel="icon" href="\/favicon\.svg" type="image\/svg\+xml"/);
   assert.doesNotMatch(html, /codex-preview|react-loading-skeleton/i);
@@ -47,6 +47,8 @@ test("supports automatic dark mode and clear capture feedback", async () => {
   ]);
 
   assert.match(styles, /prefers-color-scheme:\s*dark/);
+  assert.match(styles, /--accent:\s*#cbff4a/i);
+  assert.match(styles, /grid-template-columns:\s*repeat\(2,/);
   assert.match(styles, /@keyframes add-confirmation/);
   assert.match(page, /Intl\.RelativeTimeFormat\("pl-PL"/);
   assert.match(page, /Dodane do poczekalni/);

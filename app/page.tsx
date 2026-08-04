@@ -305,14 +305,14 @@ export default function Home() {
         <nav className="desktop-nav" aria-label="Główna nawigacja">
           <NavButton
             active={view === "review"}
-            label="Do przejrzenia"
+            label="Kolejka"
             count={activeThoughts.length}
             symbol="○"
             onClick={() => setView("review")}
           />
           <NavButton
             active={view === "all"}
-            label="Wszystkie myśli"
+            label="Wszystkie"
             count={activeThoughts.length}
             symbol="≡"
             onClick={() => setView("all")}
@@ -338,10 +338,7 @@ export default function Home() {
         {view === "review" && (
           <>
             <header className="page-heading home-heading">
-              <h1>
-                Co jeszcze chodzi Ci
-                <br className="desktop-break" /> po głowie?
-              </h1>
+              <h1>Co jeszcze chodzi Ci po głowie?</h1>
             </header>
 
             <form className="capture-form" onSubmit={submitThought}>
@@ -383,7 +380,7 @@ export default function Home() {
             <section className="review-section" aria-labelledby="review-title">
               <div className="section-heading">
                 <div>
-                  <h2 id="review-title">Rzuć okiem, bez presji</h2>
+                  <h2 id="review-title">Do przejrzenia</h2>
                 </div>
                 {activeThoughts.length > 0 && (
                   <span className="soft-count">
@@ -398,8 +395,11 @@ export default function Home() {
                 </div>
               ) : queue.length > 0 ? (
                 <div className="thought-queue">
-                  {queue.map((thought) => (
+                  {queue.map((thought, index) => (
                     <article className="thought-card" key={thought.id}>
+                      <span className="thought-index" aria-hidden="true">
+                        {String(index + 1).padStart(2, "0")}
+                      </span>
                       <div className="thought-body">
                         <p>{thought.text}</p>
                         <span>
