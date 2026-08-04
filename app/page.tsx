@@ -20,12 +20,16 @@ type StoredThoughts = {
 
 type View = "review" | "all" | "done";
 
+type AddedFeedback = {
+  id: string;
+  text: string;
+};
+
 const STORAGE_KEY = "and-1-more-thing:v1";
 const QUEUE_SIZE = 5;
 
-const dateFormatter = new Intl.DateTimeFormat("pl-PL", {
-  day: "numeric",
-  month: "long",
+const relativeTimeFormatter = new Intl.RelativeTimeFormat("pl-PL", {
+  numeric: "always",
 });
 
 function isThought(value: unknown): value is Thought {
@@ -68,8 +72,26 @@ function makeId() {
   return `thought-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
-function formatDate(value: string) {
-  return dateFormatter.format(new Date(value));
+function formatRelativeTime(value: string, currentTime: number) {
+  const elapsedSeconds = Math.max(
+    0,
+    Math.floor((currentTime - new Date(value).getTime()) / 1000),
+  );
+
+  if (elapsedSeconds < 60) return "przed chwilą";
+
+  const elapsedMinutes = Math.floor(elapsedSeconds / 60);
+  if (elapsedMinutes < 60) {
+    return relativeTimeFormatter.format(-elapsedMinutes, "minute");
+  }
+
+  const elapsedHours = Math.floor(elapsedMinutes / 60);
+  if (elapsedHours < 24) {
+    return relativeTimeFormatter.format(-elapsedHours, "hour");
+  }
+
+  const elapsedDays = Math.floor(elapsedHours / 24);
+  return relativeTimeFormatter.format(-elapsedDays, "day");
 }
 
 function thoughtSortValue(thought: Thought) {
@@ -86,8 +108,11 @@ export default function Home() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<Thought | null>(null);
+  const [addedFeedback, setAddedFeedback] = useState<AddedFeedback | null>(null);
+  const [currentTime, setCurrentTime] = useState(() => Date.now());
   const inputRef = useRef<HTMLInputElement>(null);
   const undoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const addedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const hydrationTimer = window.setTimeout(() => {
@@ -113,7 +138,17 @@ export default function Home() {
   useEffect(() => {
     return () => {
       if (undoTimer.current) clearTimeout(undoTimer.current);
+      if (addedTimer.current) clearTimeout(addedTimer.current);
     };
+  }, []);
+
+  useEffect(() => {
+    const relativeTimeInterval = window.setInterval(
+      () => setCurrentTime(Date.now()),
+      60_000,
+    );
+
+    return () => window.clearInterval(relativeTimeInterval);
   }, []);
 
   const activeThoughts = useMemo(
@@ -170,6 +205,10 @@ export default function Home() {
 
     setThoughts((current) => [thought, ...current]);
     setDraft("");
+    setCurrentTime(Date.now());
+    setAddedFeedback({ id: thought.id, text: thought.text });
+    if (addedTimer.current) clearTimeout(addedTimer.current);
+    addedTimer.current = setTimeout(() => setAddedFeedback(null), 2800);
   }
 
   function completeThought(id: string) {
@@ -286,7 +325,6 @@ export default function Home() {
             onClick={() => setView("done")}
           />
         </nav>
-
       </header>
 
       <main className="main-content">
@@ -300,19 +338,13 @@ export default function Home() {
         {view === "review" && (
           <>
             <header className="page-heading home-heading">
-              <p className="eyebrow">Tu nic nie jest pilne</p>
               <h1>
                 Co jeszcze chodzi Ci
                 <br className="desktop-break" /> po głowie?
               </h1>
-              <p className="intro">
-                Zapisz to i wróć do swojego dnia. Ta myśl zaczeka tutaj, aż
-                będziesz mieć na nią przestrzeń.
-              </p>
             </header>
 
             <form className="capture-form" onSubmit={submitThought}>
-              <label htmlFor="thought-input">Wyrzuć z głowy jedną rzecz</label>
               <div className="capture-row">
                 <input
                   ref={inputRef}
@@ -322,22 +354,35 @@ export default function Home() {
                   maxLength={280}
                   placeholder="np. Sprawdzić, czy OC jest opłacone"
                   autoComplete="off"
+                  aria-label="Myśl do zapisania"
                 />
                 <button type="submit" aria-label="Zapisz myśl">
-                  <span aria-hidden="true">+</span>
-                  Zostaw tutaj
+                  <span aria-hidden="true">{addedFeedback ? "✓" : "+"}</span>
+                  {addedFeedback ? "Dodane" : "Zostaw tutaj"}
                 </button>
               </div>
-              <div className="capture-footnote">
-                <span>Jedno zdanie wystarczy.</span>
-                <span>{draft.length}/280</span>
-              </div>
             </form>
+
+            {addedFeedback && (
+              <div
+                className="add-confirmation"
+                key={addedFeedback.id}
+                role="status"
+                aria-live="polite"
+              >
+                <span className="add-confirmation-mark" aria-hidden="true">
+                  ✓
+                </span>
+                <span>
+                  <strong>Dodane do poczekalni</strong>
+                  {addedFeedback.text}
+                </span>
+              </div>
+            )}
 
             <section className="review-section" aria-labelledby="review-title">
               <div className="section-heading">
                 <div>
-                  <p className="eyebrow">Kiedy masz chwilę</p>
                   <h2 id="review-title">Rzuć okiem, bez presji</h2>
                 </div>
                 {activeThoughts.length > 0 && (
@@ -357,7 +402,10 @@ export default function Home() {
                     <article className="thought-card" key={thought.id}>
                       <div className="thought-body">
                         <p>{thought.text}</p>
-                        <span>Zapisano {formatDate(thought.createdAt)}</span>
+                        <span>
+                          Zapisano{" "}
+                          {formatRelativeTime(thought.createdAt, currentTime)}
+                        </span>
                       </div>
                       <div className="thought-actions">
                         <button
@@ -399,12 +447,7 @@ export default function Home() {
         {view === "all" && (
           <section className="list-page" aria-labelledby="all-title">
             <header className="page-heading">
-              <p className="eyebrow">Twoja poczekalnia</p>
               <h1 id="all-title">Wszystkie myśli</h1>
-              <p className="intro">
-                Wszystko, co czeka na swój moment. Możesz poprawić treść albo
-                usunąć coś, co nie jest już ważne.
-              </p>
             </header>
 
             {allActive.length > 0 ? (
@@ -445,7 +488,10 @@ export default function Home() {
                       <>
                         <div className="list-row-copy">
                           <p>{thought.text}</p>
-                          <span>Zapisano {formatDate(thought.createdAt)}</span>
+                          <span>
+                            Zapisano{" "}
+                            {formatRelativeTime(thought.createdAt, currentTime)}
+                          </span>
                         </div>
                         <div className="row-actions">
                           <button
@@ -485,12 +531,7 @@ export default function Home() {
         {view === "done" && (
           <section className="list-page" aria-labelledby="done-title">
             <header className="page-heading">
-              <p className="eyebrow">Rzeczy, które już puściły</p>
               <h1 id="done-title">Załatwione</h1>
-              <p className="intro">
-                Małe przypomnienie, że sprawy naprawdę znikają z głowy. Jeśli
-                coś wróciło, możesz przenieść to z powrotem.
-              </p>
             </header>
 
             {completedThoughts.length > 0 ? (
@@ -503,7 +544,11 @@ export default function Home() {
                     <div>
                       <p>{thought.text}</p>
                       <span>
-                        Załatwiono {formatDate(thought.completedAt ?? thought.createdAt)}
+                        Załatwiono{" "}
+                        {formatRelativeTime(
+                          thought.completedAt ?? thought.createdAt,
+                          currentTime,
+                        )}
                       </span>
                     </div>
                     <button
