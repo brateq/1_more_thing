@@ -23,12 +23,6 @@ type View = "review" | "all" | "done";
 const STORAGE_KEY = "and-1-more-thing:v1";
 const QUEUE_SIZE = 5;
 
-const exampleThoughts = [
-  "kupić chleb",
-  "sprawdzić, czy OC jest opłacone",
-  "odpisać na tę wiadomość",
-];
-
 const dateFormatter = new Intl.DateTimeFormat("pl-PL", {
   day: "numeric",
   month: "long",
@@ -254,14 +248,9 @@ export default function Home() {
     setDeleteTarget(null);
   }
 
-  function chooseExample(example: string) {
-    setDraft(example.charAt(0).toUpperCase() + example.slice(1));
-    inputRef.current?.focus();
-  }
-
   return (
     <div className="app-shell">
-      <aside className="sidebar" aria-label="Główna nawigacja">
+      <header className="sidebar">
         <button
           className="brand"
           type="button"
@@ -271,14 +260,10 @@ export default function Home() {
           <span className="brand-mark" aria-hidden="true">
             +1
           </span>
-          <span className="brand-copy">
-            And 1 more
-            <br />
-            thing
-          </span>
+          <span className="brand-copy">And 1 more thing</span>
         </button>
 
-        <nav className="desktop-nav">
+        <nav className="desktop-nav" aria-label="Główna nawigacja">
           <NavButton
             active={view === "review"}
             label="Do przejrzenia"
@@ -302,12 +287,7 @@ export default function Home() {
           />
         </nav>
 
-        <p className="sidebar-note">
-          To nie jest lista na dziś.
-          <br />
-          To spokojne miejsce na później.
-        </p>
-      </aside>
+      </header>
 
       <main className="main-content">
         {saveError && (
@@ -373,11 +353,8 @@ export default function Home() {
                 </div>
               ) : queue.length > 0 ? (
                 <div className="thought-queue">
-                  {queue.map((thought, index) => (
+                  {queue.map((thought) => (
                     <article className="thought-card" key={thought.id}>
-                      <div className="thought-number" aria-hidden="true">
-                        {String(index + 1).padStart(2, "0")}
-                      </div>
                       <div className="thought-body">
                         <p>{thought.text}</p>
                         <span>Zapisano {formatDate(thought.createdAt)}</span>
@@ -413,17 +390,6 @@ export default function Home() {
                     Nie ma tu jeszcze żadnych myśli do przejrzenia. Możesz
                     zostawić pierwszą powyżej.
                   </p>
-                  <div className="examples" aria-label="Przykładowe myśli">
-                    {exampleThoughts.map((example) => (
-                      <button
-                        type="button"
-                        key={example}
-                        onClick={() => chooseExample(example)}
-                      >
-                        + {example}
-                      </button>
-                    ))}
-                  </div>
                 </div>
               )}
             </section>
