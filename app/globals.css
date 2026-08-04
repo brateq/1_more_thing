@@ -332,6 +332,11 @@ h1 {
   gap: 8px;
 }
 
+.input-shell {
+  position: relative;
+  min-width: 0;
+}
+
 .capture-row input {
   width: 100%;
   min-height: 64px;
@@ -343,6 +348,24 @@ h1 {
   font-size: 16px;
   font-weight: 520;
   letter-spacing: -0.015em;
+}
+
+.rotating-placeholder {
+  position: absolute;
+  top: 50%;
+  right: 20px;
+  left: 20px;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 16px;
+  font-weight: 520;
+  letter-spacing: -0.015em;
+  line-height: 1.2;
+  opacity: 0;
+  pointer-events: none;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  animation: placeholder-cycle 4.2s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .capture-row input:focus-visible {
@@ -847,6 +870,22 @@ h1 {
   }
 }
 
+@keyframes placeholder-cycle {
+  0% {
+    opacity: 0;
+    transform: translateY(calc(-50% + 7px));
+  }
+  12%,
+  82% {
+    opacity: 0.72;
+    transform: translateY(-50%);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(calc(-50% - 5px));
+  }
+}
+
 .list-row:hover,
 .completed-row:hover {
   border-color: var(--line-strong);
@@ -1189,6 +1228,12 @@ h1 {
     font-size: 15px;
   }
 
+  .rotating-placeholder {
+    right: 15px;
+    left: 15px;
+    font-size: 15px;
+  }
+
   .capture-row button {
     min-height: 52px;
   }
@@ -1290,8 +1335,14 @@ h1 {
   }
 
   .app-shell::before,
-  .soft-count::before {
+  .soft-count::before,
+  .rotating-placeholder {
     animation: none !important;
+  }
+
+  .rotating-placeholder {
+    opacity: 0.72;
+    transform: translateY(-50%);
   }
 
   *,

@@ -27,6 +27,14 @@ type AddedFeedback = {
 
 const STORAGE_KEY = "and-1-more-thing:v1";
 const QUEUE_SIZE = 5;
+const EXAMPLE_ROTATION_MS = 4200;
+const THOUGHT_EXAMPLES = [
+  "np. Sprawdzić, czy OC jest opłacone",
+  "np. Kupić chleb po pracy",
+  "np. Umówić wizytę u dentysty",
+  "np. Oddać książkę Ani",
+  "np. Wybrać prezent na urodziny taty",
+];
 
 const relativeTimeFormatter = new Intl.RelativeTimeFormat("pl-PL", {
   numeric: "always",
@@ -110,6 +118,7 @@ export default function Home() {
   const [deleteTarget, setDeleteTarget] = useState<Thought | null>(null);
   const [addedFeedback, setAddedFeedback] = useState<AddedFeedback | null>(null);
   const [currentTime, setCurrentTime] = useState(() => Date.now());
+  const [exampleIndex, setExampleIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const undoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const addedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -150,6 +159,21 @@ export default function Home() {
 
     return () => window.clearInterval(relativeTimeInterval);
   }, []);
+
+  useEffect(() => {
+    if (draft.length > 0) return;
+
+    const reducedMotion = window.matchMedia(
+      "(prefers-reduced-motion: reduce)",
+    );
+    if (reducedMotion.matches) return;
+
+    const exampleTimer = window.setInterval(() => {
+      setExampleIndex((current) => (current + 1) % THOUGHT_EXAMPLES.length);
+    }, EXAMPLE_ROTATION_MS);
+
+    return () => window.clearInterval(exampleTimer);
+  }, [draft]);
 
   const activeThoughts = useMemo(
     () => thoughts.filter((thought) => thought.status === "active"),
@@ -343,16 +367,26 @@ export default function Home() {
 
             <form className="capture-form" onSubmit={submitThought}>
               <div className="capture-row">
-                <input
-                  ref={inputRef}
-                  id="thought-input"
-                  value={draft}
-                  onChange={(event) => setDraft(event.target.value)}
-                  maxLength={280}
-                  placeholder="np. Sprawdzić, czy OC jest opłacone"
-                  autoComplete="off"
-                  aria-label="Myśl do zapisania"
-                />
+                <div className="input-shell">
+                  <input
+                    ref={inputRef}
+                    id="thought-input"
+                    value={draft}
+                    onChange={(event) => setDraft(event.target.value)}
+                    maxLength={280}
+                    autoComplete="off"
+                    aria-label="Myśl do zapisania"
+                  />
+                  {draft.length === 0 && (
+                    <span
+                      className="rotating-placeholder"
+                      key={exampleIndex}
+                      aria-hidden="true"
+                    >
+                      {THOUGHT_EXAMPLES[exampleIndex]}
+                    </span>
+                  )}
+                </div>
                 <button type="submit" aria-label="Zapisz myśl">
                   <span aria-hidden="true">{addedFeedback ? "✓" : "+"}</span>
                   {addedFeedback ? "Dodane" : "Zostaw tutaj"}

@@ -51,8 +51,12 @@ test("supports automatic dark mode and clear capture feedback", async () => {
   assert.match(styles, /grid-template-columns:\s*minmax\(0, 1fr\)/);
   assert.match(styles, /@keyframes row-enter/);
   assert.match(styles, /@keyframes ambient-drift/);
+  assert.match(styles, /@keyframes placeholder-cycle/);
   assert.match(styles, /@keyframes add-confirmation/);
   assert.match(page, /Intl\.RelativeTimeFormat\("pl-PL"/);
+  assert.match(page, /THOUGHT_EXAMPLES/);
+  assert.match(page, /Kupić chleb po pracy/);
+  assert.match(page, /prefers-reduced-motion: reduce/);
   assert.match(page, /Dodane do poczekalni/);
   assert.doesNotMatch(page, /Tu nic nie jest pilne|Jedno zdanie wystarczy/);
 });
