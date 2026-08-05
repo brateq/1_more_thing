@@ -30,7 +30,7 @@ test("renders the finished And 1 more thing interface", async () => {
 
   const html = await response.text();
   assert.match(html, /<html lang="pl">/i);
-  assert.match(html, /<title>And 1 more thing/);
+  assert.match(html, /<title>And 1 more thing<\/title>/);
   assert.match(html, /Co jeszcze chodzi Ci/);
   assert.match(html, /Zostaw tutaj/);
   assert.match(html, /Do przejrzenia/);
