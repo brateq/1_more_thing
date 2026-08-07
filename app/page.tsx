@@ -146,7 +146,10 @@ export default function Home() {
   const [loginError, setLoginError] = useState("");
   const [loginBusy, setLoginBusy] = useState(false);
   const [migrationNotice, setMigrationNotice] = useState<number | null>(null);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const mobileMenuRef = useRef<HTMLDivElement>(null);
+  const mobileMenuButtonRef = useRef<HTMLButtonElement>(null);
   const undoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const addedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mutationQueue = useRef<Promise<void>>(Promise.resolve());
@@ -242,6 +245,31 @@ export default function Home() {
       if (addedTimer.current) clearTimeout(addedTimer.current);
     };
   }, []);
+
+  useEffect(() => {
+    if (!mobileMenuOpen) return;
+
+    const closeOnOutsideClick = (event: PointerEvent) => {
+      if (
+        event.target instanceof Node &&
+        !mobileMenuRef.current?.contains(event.target)
+      ) {
+        setMobileMenuOpen(false);
+      }
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      setMobileMenuOpen(false);
+      mobileMenuButtonRef.current?.focus();
+    };
+
+    document.addEventListener("pointerdown", closeOnOutsideClick);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeOnOutsideClick);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [mobileMenuOpen]);
 
   useEffect(() => {
     const relativeTimeInterval = window.setInterval(
@@ -353,6 +381,7 @@ export default function Home() {
   }
 
   async function logout() {
+    setMobileMenuOpen(false);
     await fetch("/api/auth/logout", { method: "POST" }).catch(() => undefined);
     setThoughts([]);
     setHydrated(false);
@@ -524,7 +553,10 @@ export default function Home() {
         <button
           className="brand"
           type="button"
-          onClick={() => setView("review")}
+          onClick={() => {
+            setView("review");
+            setMobileMenuOpen(false);
+          }}
           aria-label="1 more thing — strona główna"
         >
           <span className="brand-mark" aria-hidden="true">
@@ -559,6 +591,66 @@ export default function Home() {
         <button className="logout-button" type="button" onClick={logout}>
           Wyloguj
         </button>
+
+        <div className="mobile-menu" ref={mobileMenuRef}>
+          <button
+            ref={mobileMenuButtonRef}
+            className={`menu-toggle${mobileMenuOpen ? " open" : ""}`}
+            type="button"
+            aria-label={mobileMenuOpen ? "Zamknij menu" : "Otwórz menu"}
+            aria-expanded={mobileMenuOpen}
+            aria-controls="mobile-menu-panel"
+            onClick={() => setMobileMenuOpen((open) => !open)}
+          >
+            <span aria-hidden="true" />
+            <span aria-hidden="true" />
+            <span aria-hidden="true" />
+          </button>
+
+          {mobileMenuOpen && (
+            <div className="mobile-menu-panel" id="mobile-menu-panel">
+              <nav aria-label="Główna nawigacja mobilna">
+                <NavButton
+                  active={view === "review"}
+                  label="Przejrzyj"
+                  count={activeThoughts.length}
+                  symbol="○"
+                  onClick={() => {
+                    setView("review");
+                    setMobileMenuOpen(false);
+                  }}
+                />
+                <NavButton
+                  active={view === "all"}
+                  label="Wszystkie"
+                  count={activeThoughts.length}
+                  symbol="≡"
+                  onClick={() => {
+                    setView("all");
+                    setMobileMenuOpen(false);
+                  }}
+                />
+                <NavButton
+                  active={view === "done"}
+                  label="Załatwione"
+                  count={completedThoughts.length}
+                  symbol="✓"
+                  onClick={() => {
+                    setView("done");
+                    setMobileMenuOpen(false);
+                  }}
+                />
+              </nav>
+              <button
+                className="mobile-logout-button"
+                type="button"
+                onClick={logout}
+              >
+                Wyloguj
+              </button>
+            </div>
+          )}
+        </div>
       </header>
 
       <main className="main-content">
@@ -827,27 +919,6 @@ export default function Home() {
           </section>
         )}
       </main>
-
-      <nav className="mobile-nav" aria-label="Główna nawigacja">
-        <NavButton
-          active={view === "review"}
-          label="Przejrzyj"
-          symbol="○"
-          onClick={() => setView("review")}
-        />
-        <NavButton
-          active={view === "all"}
-          label="Wszystkie"
-          symbol="≡"
-          onClick={() => setView("all")}
-        />
-        <NavButton
-          active={view === "done"}
-          label="Załatwione"
-          symbol="✓"
-          onClick={() => setView("done")}
-        />
-      </nav>
 
       {undoThought && (
         <div className="toast" role="status" aria-live="polite">

@@ -827,11 +827,6 @@ h1 {
   gap: 7px;
 }
 
-.thought-card:first-child .thought-actions {
-  grid-column: auto;
-  grid-row: auto;
-}
-
 .button-secondary,
 .button-primary,
 .danger-button {
@@ -1298,7 +1293,7 @@ h1 {
   color: #111410;
 }
 
-.mobile-nav {
+.mobile-menu {
   display: none;
 }
 
@@ -1318,7 +1313,7 @@ h1 {
   }
 
   .logout-button {
-    margin-left: auto;
+    display: none;
   }
 
   .desktop-nav {
@@ -1328,45 +1323,121 @@ h1 {
   .main-content {
     width: calc(100% - 32px);
     min-height: calc(100vh - 72px);
-    padding: 64px 0 112px;
+    padding: 64px 0 72px;
   }
 
-  .mobile-nav {
-    position: fixed;
-    left: 50%;
-    bottom: 12px;
-    z-index: 15;
-    width: calc(100% - 24px);
-    max-width: 480px;
-    min-height: 66px;
+  .mobile-menu {
+    position: relative;
+    margin-left: auto;
+    display: block;
+  }
+
+  .menu-toggle {
+    width: 42px;
+    height: 42px;
+    padding: 0;
+    border: 1px solid var(--line);
+    border-radius: 11px;
+    background: var(--nav-bg);
+    display: grid;
+    place-content: center;
+    gap: 4px;
+    cursor: pointer;
+  }
+
+  .menu-toggle > span {
+    width: 17px;
+    height: 2px;
+    border-radius: 99px;
+    background: currentColor;
+    transition: opacity 160ms ease, transform 180ms ease;
+  }
+
+  .menu-toggle.open > span:first-child {
+    transform: translateY(6px) rotate(45deg);
+  }
+
+  .menu-toggle.open > span:nth-child(2) {
+    opacity: 0;
+  }
+
+  .menu-toggle.open > span:last-child {
+    transform: translateY(-6px) rotate(-45deg);
+  }
+
+  .mobile-menu-panel {
+    position: absolute;
+    top: calc(100% + 10px);
+    right: 0;
+    z-index: 20;
+    width: min(280px, calc(100vw - 32px));
     padding: 6px;
     border: 1px solid var(--line-strong);
-    border-radius: 17px;
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    border-radius: 15px;
     background: var(--nav-bg);
-    transform: translateX(-50%);
     box-shadow: var(--shadow);
     backdrop-filter: blur(20px);
+    animation: menu-enter 180ms cubic-bezier(0.22, 1, 0.36, 1) both;
   }
 
-  .mobile-nav .nav-button {
-    min-height: 52px;
-    padding: 4px;
+  .mobile-menu-panel nav {
     display: grid;
-    grid-template-rows: 22px auto;
-    justify-items: center;
     gap: 2px;
-    font-size: 9px;
   }
 
-  .mobile-nav .nav-button.active {
-    background: var(--accent);
+  .mobile-menu-panel .nav-button {
+    width: 100%;
+    min-height: 46px;
+    padding: 0 12px;
+    justify-content: flex-start;
+    font-size: 11px;
+  }
+
+  .mobile-menu-panel .nav-symbol {
+    width: 20px;
+    text-align: center;
+  }
+
+  .mobile-menu-panel .nav-count {
+    margin-left: auto;
+  }
+
+  .mobile-logout-button {
+    width: 100%;
+    min-height: 44px;
+    margin-top: 5px;
+    padding: 0 12px;
+    border: 0;
+    border-top: 1px solid var(--line);
+    border-radius: 0 0 9px 9px;
+    background: transparent;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    font-size: 10px;
+    font-weight: 750;
+  }
+
+  .mobile-logout-button:hover {
+    background: var(--soft);
+    color: var(--ink);
   }
 
   .toast {
     right: 16px;
-    bottom: 92px;
+    bottom: 16px;
+  }
+}
+
+@keyframes menu-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
   }
 }
 
