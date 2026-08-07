@@ -1,6 +1,13 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import {
+  FormEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
 type ThoughtStatus = "active" | "done";
 
@@ -19,6 +26,12 @@ type StoredThoughts = {
 };
 
 type View = "review" | "all" | "done";
+type AuthState =
+  | "checking"
+  | "authenticated"
+  | "anonymous"
+  | "misconfigured"
+  | "error";
 
 type AddedFeedback = {
   id: string;
@@ -26,6 +39,7 @@ type AddedFeedback = {
 };
 
 const STORAGE_KEY = "and-1-more-thing:v1";
+const MIGRATION_KEY = "and-1-more-thing:sqlite-migrated:v1";
 const QUEUE_SIZE = 5;
 const EXAMPLE_ROTATION_MS = 4200;
 const THOUGHT_EXAMPLES = [
@@ -106,6 +120,14 @@ function thoughtSortValue(thought: Thought) {
   return new Date(thought.lastPresentedAt ?? thought.createdAt).getTime();
 }
 
+async function readJson<T>(response: Response): Promise<T> {
+  const body = (await response.json()) as T;
+  if (!response.ok) {
+    throw new Error(`Request failed with status ${response.status}`);
+  }
+  return body;
+}
+
 export default function Home() {
   const [thoughts, setThoughts] = useState<Thought[]>([]);
   const [view, setView] = useState<View>("review");
@@ -119,30 +141,100 @@ export default function Home() {
   const [addedFeedback, setAddedFeedback] = useState<AddedFeedback | null>(null);
   const [currentTime, setCurrentTime] = useState(() => Date.now());
   const [exampleIndex, setExampleIndex] = useState(0);
+  const [authState, setAuthState] = useState<AuthState>("checking");
+  const [loginPassword, setLoginPassword] = useState("");
+  const [loginError, setLoginError] = useState("");
+  const [loginBusy, setLoginBusy] = useState(false);
+  const [migrationNotice, setMigrationNotice] = useState<number | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const undoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const addedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const mutationQueue = useRef<Promise<void>>(Promise.resolve());
 
-  useEffect(() => {
-    const hydrationTimer = window.setTimeout(() => {
-      setThoughts(readStoredThoughts());
-      setHydrated(true);
-    }, 0);
+  const refreshThoughts = useCallback(async () => {
+    const response = await fetch("/api/thoughts", { cache: "no-store" });
+    if (response.status === 401) {
+      setAuthState("anonymous");
+      throw new Error("Unauthorized");
+    }
 
-    return () => window.clearTimeout(hydrationTimer);
+    const body = await readJson<{ thoughts: unknown[] }>(response);
+    setThoughts(body.thoughts.filter(isThought));
+    setCurrentTime(Date.now());
+    setSaveError(false);
   }, []);
 
-  useEffect(() => {
-    if (!hydrated) return;
+  const loadSynchronizedThoughts = useCallback(async () => {
+    const migrationDone = window.localStorage.getItem(MIGRATION_KEY) === "1";
+    const storedThoughts = migrationDone ? [] : readStoredThoughts();
 
-    try {
-      const store: StoredThoughts = { version: 1, thoughts };
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
-      queueMicrotask(() => setSaveError(false));
-    } catch {
-      queueMicrotask(() => setSaveError(true));
+    if (storedThoughts.length > 0) {
+      const response = await fetch("/api/thoughts/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ thoughts: storedThoughts }),
+      });
+      const body = await readJson<{ imported: number }>(response);
+      setMigrationNotice(body.imported);
     }
-  }, [thoughts, hydrated]);
+
+    window.localStorage.setItem(MIGRATION_KEY, "1");
+    await refreshThoughts();
+    setHydrated(true);
+  }, [refreshThoughts]);
+
+  useEffect(() => {
+    let active = true;
+
+    async function initialize() {
+      try {
+        const response = await fetch("/api/auth/session", {
+          cache: "no-store",
+        });
+        const session = await readJson<{
+          authenticated: boolean;
+          configured: boolean;
+        }>(response);
+        if (!active) return;
+
+        if (!session.configured) {
+          setAuthState("misconfigured");
+          return;
+        }
+        if (!session.authenticated) {
+          setAuthState("anonymous");
+          return;
+        }
+
+        setAuthState("authenticated");
+        await loadSynchronizedThoughts();
+      } catch {
+        if (active) setAuthState("error");
+      }
+    }
+
+    void initialize();
+    return () => {
+      active = false;
+    };
+  }, [loadSynchronizedThoughts]);
+
+  useEffect(() => {
+    if (authState !== "authenticated") return;
+
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === "visible") {
+        void refreshThoughts().catch(() => setSaveError(true));
+      }
+    };
+
+    window.addEventListener("focus", refreshWhenVisible);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+    return () => {
+      window.removeEventListener("focus", refreshWhenVisible);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+    };
+  }, [authState, refreshThoughts]);
 
   useEffect(() => {
     return () => {
@@ -209,6 +301,64 @@ export default function Home() {
     [thoughts],
   );
 
+  function synchronize(url: string, init: RequestInit) {
+    mutationQueue.current = mutationQueue.current
+      .then(async () => {
+        const response = await fetch(url, init);
+        if (response.status === 401) {
+          setAuthState("anonymous");
+          throw new Error("Unauthorized");
+        }
+        if (!response.ok) throw new Error("Synchronization failed");
+        setSaveError(false);
+      })
+      .catch(async () => {
+        setSaveError(true);
+        await refreshThoughts().catch(() => undefined);
+      });
+  }
+
+  async function submitLogin(event: FormEvent) {
+    event.preventDefault();
+    if (!loginPassword) return;
+
+    setLoginBusy(true);
+    setLoginError("");
+    try {
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: loginPassword }),
+      });
+
+      if (response.status === 429) {
+        setLoginError("Za dużo prób. Spróbuj ponownie za kilkanaście minut.");
+        return;
+      }
+      if (!response.ok) {
+        setLoginError("To nie jest właściwe hasło.");
+        return;
+      }
+
+      setLoginPassword("");
+      setHydrated(false);
+      setAuthState("authenticated");
+      await loadSynchronizedThoughts();
+    } catch {
+      setAuthState("error");
+      setLoginError("Nie udało się połączyć z aplikacją.");
+    } finally {
+      setLoginBusy(false);
+    }
+  }
+
+  async function logout() {
+    await fetch("/api/auth/logout", { method: "POST" }).catch(() => undefined);
+    setThoughts([]);
+    setHydrated(false);
+    setAuthState("anonymous");
+  }
+
   function submitThought(event: FormEvent) {
     event.preventDefault();
     const text = draft.trim();
@@ -229,10 +379,15 @@ export default function Home() {
 
     setThoughts((current) => [thought, ...current]);
     setDraft("");
-    setCurrentTime(Date.now());
+    setCurrentTime(new Date(now).getTime());
     setAddedFeedback({ id: thought.id, text: thought.text });
     if (addedTimer.current) clearTimeout(addedTimer.current);
     addedTimer.current = setTimeout(() => setAddedFeedback(null), 2800);
+    void synchronize("/api/thoughts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ thought }),
+    });
   }
 
   function completeThought(id: string) {
@@ -249,6 +404,11 @@ export default function Home() {
     setUndoThought(thought);
     if (undoTimer.current) clearTimeout(undoTimer.current);
     undoTimer.current = setTimeout(() => setUndoThought(null), 6000);
+    void synchronize(`/api/thoughts/${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "done", completedAt }),
+    });
   }
 
   function deferThought(id: string) {
@@ -260,6 +420,11 @@ export default function Home() {
           : thought,
       ),
     );
+    void synchronize(`/api/thoughts/${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ lastPresentedAt: deferredAt }),
+    });
   }
 
   function restoreThought(id: string) {
@@ -275,6 +440,15 @@ export default function Home() {
           : thought,
       ),
     );
+    void synchronize(`/api/thoughts/${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        status: "active",
+        completedAt: null,
+        lastPresentedAt: null,
+      }),
+    });
   }
 
   function undoCompletion() {
@@ -301,6 +475,11 @@ export default function Home() {
     );
     setEditingId(null);
     setEditingText("");
+    void synchronize(`/api/thoughts/${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text }),
+    });
   }
 
   function deleteThought() {
@@ -308,7 +487,35 @@ export default function Home() {
     setThoughts((current) =>
       current.filter((thought) => thought.id !== deleteTarget.id),
     );
+    void synchronize(
+      `/api/thoughts/${encodeURIComponent(deleteTarget.id)}`,
+      { method: "DELETE" },
+    );
     setDeleteTarget(null);
+  }
+
+  if (authState === "checking") {
+    return <AccessScreen mode="loading" />;
+  }
+
+  if (authState === "misconfigured") {
+    return <AccessScreen mode="misconfigured" />;
+  }
+
+  if (authState === "error") {
+    return <AccessScreen mode="error" />;
+  }
+
+  if (authState === "anonymous") {
+    return (
+      <LoginScreen
+        password={loginPassword}
+        error={loginError}
+        busy={loginBusy}
+        onPasswordChange={setLoginPassword}
+        onSubmit={submitLogin}
+      />
+    );
   }
 
   return (
@@ -349,13 +556,27 @@ export default function Home() {
             onClick={() => setView("done")}
           />
         </nav>
+        <button className="logout-button" type="button" onClick={logout}>
+          Wyloguj
+        </button>
       </header>
 
       <main className="main-content">
         {saveError && (
           <div className="save-alert" role="alert">
-            Nie udało się zapisać zmiany w tej przeglądarce. Zostanie widoczna
-            tylko do zamknięcia strony.
+            Nie udało się zsynchronizować ostatniej zmiany. Przywrócono dane
+            zapisane na serwerze.
+          </div>
+        )}
+
+        {migrationNotice !== null && (
+          <div className="migration-alert" role="status">
+            {migrationNotice > 0
+              ? `Przeniesiono ${migrationNotice} zapisanych wcześniej myśli.`
+              : "Twoje wcześniejsze myśli są już zsynchronizowane."}
+            <button type="button" onClick={() => setMigrationNotice(null)}>
+              OK
+            </button>
           </div>
         )}
 
@@ -669,6 +890,82 @@ export default function Home() {
         </div>
       )}
     </div>
+  );
+}
+
+function LoginScreen({
+  password,
+  error,
+  busy,
+  onPasswordChange,
+  onSubmit,
+}: {
+  password: string;
+  error: string;
+  busy: boolean;
+  onPasswordChange: (value: string) => void;
+  onSubmit: (event: FormEvent) => void;
+}) {
+  return (
+    <main className="access-page">
+      <section className="login-card" aria-labelledby="login-title">
+        <div className="login-brand" aria-hidden="true">
+          <span className="brand-mark">+1</span>
+          <span>And 1 more thing</span>
+        </div>
+        <p className="eyebrow">Prywatna przestrzeń</p>
+        <h1 id="login-title">Dobrze Cię widzieć.</h1>
+        <form className="login-form" onSubmit={onSubmit}>
+          <label htmlFor="login-password">Hasło</label>
+          <input
+            id="login-password"
+            type="password"
+            value={password}
+            onChange={(event) => onPasswordChange(event.target.value)}
+            autoComplete="current-password"
+            autoFocus
+            required
+          />
+          {error && <p className="login-error">{error}</p>}
+          <button type="submit" disabled={busy}>
+            {busy ? "Otwieram…" : "Wejdź"}
+          </button>
+        </form>
+      </section>
+    </main>
+  );
+}
+
+function AccessScreen({
+  mode,
+}: {
+  mode: "loading" | "misconfigured" | "error";
+}) {
+  const content = {
+    loading: {
+      title: "Chwila…",
+      copy: "Łączę się z Twoją listą.",
+    },
+    misconfigured: {
+      title: "Brakuje konfiguracji dostępu.",
+      copy: "Ustaw AUTH_PASSWORD_HASH i SESSION_SECRET w środowisku aplikacji.",
+    },
+    error: {
+      title: "Nie udało się otworzyć aplikacji.",
+      copy: "Sprawdź połączenie i spróbuj odświeżyć stronę.",
+    },
+  }[mode];
+
+  return (
+    <main className="access-page">
+      <section className="access-message" aria-live="polite">
+        <span className="brand-mark" aria-hidden="true">
+          +1
+        </span>
+        <h1>{content.title}</h1>
+        <p>{content.copy}</p>
+      </section>
+    </main>
   );
 }
 

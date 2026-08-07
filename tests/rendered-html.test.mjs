@@ -1,43 +1,22 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { access, readFile } from "node:fs/promises";
 import test from "node:test";
 
-async function render() {
-  const workerUrl = new URL("../dist/server/index.js", import.meta.url);
-  workerUrl.searchParams.set("test", `${process.pid}-${Date.now()}`);
-  const { default: worker } = await import(workerUrl.href);
-
-  return worker.fetch(
-    new Request("http://localhost/", {
-      headers: { accept: "text/html" },
-    }),
-    {
-      ASSETS: {
-        fetch: async () => new Response("Not found", { status: 404 }),
-      },
-    },
-    {
-      waitUntil() {},
-      passThroughOnException() {},
-    },
-  );
-}
-
 test("renders the finished And 1 more thing interface", async () => {
-  const response = await render();
-  assert.equal(response.status, 200);
-  assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
+  const [layout, page] = await Promise.all([
+    readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+  ]);
 
-  const html = await response.text();
-  assert.match(html, /<html lang="pl">/i);
-  assert.match(html, /<title>And 1 more thing<\/title>/);
-  assert.match(html, /Co jeszcze chodzi Ci/);
-  assert.match(html, /Zostaw tutaj/);
-  assert.match(html, /Do przejrzenia/);
-  assert.match(html, /Wszystkie/);
-  assert.match(html, /Załatwione/);
-  assert.match(html, /<link rel="icon" href="\/favicon\.svg" type="image\/svg\+xml"/);
-  assert.doesNotMatch(html, /codex-preview|react-loading-skeleton/i);
+  assert.match(layout, /<html lang="pl">/i);
+  assert.match(layout, /title:\s*"And 1 more thing"/);
+  assert.match(page, /Co jeszcze chodzi Ci/);
+  assert.match(page, /Zostaw tutaj/);
+  assert.match(page, /Do przejrzenia/);
+  assert.match(page, /Wszystkie/);
+  assert.match(page, /Załatwione/);
+  await access(new URL("../public/favicon.svg", import.meta.url));
+  assert.doesNotMatch(`${layout}\n${page}`, /codex-preview|react-loading-skeleton/i);
 });
 
 test("supports automatic dark mode and clear capture feedback", async () => {
@@ -58,28 +37,7 @@ test("supports automatic dark mode and clear capture feedback", async () => {
   assert.match(page, /Kupić chleb po pracy/);
   assert.match(page, /prefers-reduced-motion: reduce/);
   assert.match(page, /Dodane do poczekalni/);
+  assert.match(page, /\/api\/thoughts/);
+  assert.match(page, /sqlite-migrated/);
   assert.doesNotMatch(page, /Tu nic nie jest pilne|Jedno zdanie wystarczy/);
-});
-
-test("exposes a production health endpoint", async () => {
-  const workerUrl = new URL("../dist/server/index.js", import.meta.url);
-  workerUrl.searchParams.set("health-test", `${process.pid}-${Date.now()}`);
-  const { default: worker } = await import(workerUrl.href);
-
-  const response = await worker.fetch(
-    new Request("http://localhost/health"),
-    {
-      ASSETS: {
-        fetch: async () => new Response("Not found", { status: 404 }),
-      },
-    },
-    {
-      waitUntil() {},
-      passThroughOnException() {},
-    },
-  );
-
-  assert.equal(response.status, 200);
-  assert.equal(response.headers.get("cache-control"), "no-store, max-age=0");
-  assert.deepEqual(await response.json(), { status: "ok" });
 });

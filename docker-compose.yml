@@ -9,6 +9,12 @@ services:
       NODE_ENV: production
       HOST: 0.0.0.0
       PORT: "3000"
+      DATABASE_PATH: /app/data/and1.db
+      MIGRATIONS_PATH: /app/drizzle
+      AUTH_PASSWORD_HASH: ${AUTH_PASSWORD_HASH:?Set AUTH_PASSWORD_HASH in Dokploy}
+      SESSION_SECRET: ${SESSION_SECRET:?Set SESSION_SECRET in Dokploy}
+    volumes:
+      - sqlite_data:/app/data
     expose:
       - "3000"
     healthcheck:
@@ -29,3 +35,6 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+
+volumes:
+  sqlite_data:
