@@ -1,4 +1,4 @@
-# And 1 more thing
+# 1 more thing
 
 Spokojna, responsywna aplikacja webowa do odkładania na później myśli, które
 niepotrzebnie zajmują głowę. Dane są przechowywane w centralnej bazie SQLite i

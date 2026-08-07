@@ -2,14 +2,14 @@ import assert from "node:assert/strict";
 import { access, readFile } from "node:fs/promises";
 import test from "node:test";
 
-test("renders the finished And 1 more thing interface", async () => {
+test("renders the finished 1 more thing interface", async () => {
   const [layout, page] = await Promise.all([
     readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
   ]);
 
   assert.match(layout, /<html lang="pl">/i);
-  assert.match(layout, /title:\s*"And 1 more thing"/);
+  assert.match(layout, /title:\s*"1 more thing"/);
   assert.match(page, /Co jeszcze chodzi Ci/);
   assert.match(page, /Zostaw tutaj/);
   assert.match(page, /Do przejrzenia/);

@@ -72,7 +72,7 @@ test("persists and protects synchronized thoughts in standalone mode", async (t)
 
   const home = await fetch(baseUrl);
   assert.equal(home.status, 200);
-  assert.match(await home.text(), /<title>And 1 more thing<\/title>/);
+  assert.match(await home.text(), /<title>1 more thing<\/title>/);
 
   const health = await fetch(`${baseUrl}/health`);
   assert.equal(health.status, 200);

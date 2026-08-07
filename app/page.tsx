@@ -525,12 +525,12 @@ export default function Home() {
           className="brand"
           type="button"
           onClick={() => setView("review")}
-          aria-label="And 1 more thing — strona główna"
+          aria-label="1 more thing — strona główna"
         >
           <span className="brand-mark" aria-hidden="true">
             +1
           </span>
-          <span className="brand-copy">And 1 more thing</span>
+          <span className="brand-copy">1 more thing</span>
         </button>
 
         <nav className="desktop-nav" aria-label="Główna nawigacja">
@@ -911,7 +911,7 @@ function LoginScreen({
       <section className="login-card" aria-labelledby="login-title">
         <div className="login-brand" aria-hidden="true">
           <span className="brand-mark">+1</span>
-          <span>And 1 more thing</span>
+          <span>1 more thing</span>
         </div>
         <p className="eyebrow">Prywatna przestrzeń</p>
         <h1 id="login-title">Dobrze Cię widzieć.</h1>
