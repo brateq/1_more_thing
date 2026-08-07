@@ -46,3 +46,20 @@ test("supports automatic dark mode and clear capture feedback", async () => {
   assert.match(styles, /\.mobile-menu-panel/);
   assert.doesNotMatch(page, /Tu nic nie jest pilne|Jedno zdanie wystarczy/);
 });
+
+test("shows an interactive 30-day queue history chart", async () => {
+  const [page, styles] = await Promise.all([
+    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(page, /type View = "review" \| "all" \| "done" \| "stats"/);
+  assert.match(page, /const STATISTICS_DAYS = 30/);
+  assert.match(page, /function buildQueueHistory/);
+  assert.match(page, /function QueueHistoryChart/);
+  assert.match(page, /Zadania w kolejce/);
+  assert.match(page, /onPointerMove=\{selectClosestPoint\}/);
+  assert.match(page, /event\.key === "ArrowLeft"/);
+  assert.match(styles, /\.queue-chart-shell/);
+  assert.match(styles, /\.chart-crosshair/);
+});

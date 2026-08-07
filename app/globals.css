@@ -914,6 +914,105 @@ h1 {
   margin-bottom: 54px;
 }
 
+.statistics-page {
+  width: 100%;
+  animation: content-enter 650ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.statistics-heading {
+  margin-bottom: 42px;
+}
+
+.queue-chart-shell {
+  width: 100%;
+  padding: 20px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--surface-strong);
+  box-shadow: var(--shadow);
+}
+
+.queue-chart {
+  width: 100%;
+  height: auto;
+  display: block;
+  overflow: visible;
+  cursor: crosshair;
+  touch-action: pan-y;
+}
+
+.queue-chart:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: -1px;
+  border-radius: 12px;
+}
+
+.chart-grid-line {
+  stroke: var(--line);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.chart-axis-label {
+  fill: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.chart-area {
+  fill: url("#queue-chart-area");
+}
+
+.chart-line {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.chart-interaction-layer {
+  fill: transparent;
+}
+
+.chart-crosshair {
+  stroke: var(--muted);
+  stroke-width: 1;
+  stroke-dasharray: 4 5;
+  opacity: 0.55;
+  vector-effect: non-scaling-stroke;
+}
+
+.chart-active-point-halo {
+  fill: var(--accent);
+  opacity: 0.23;
+}
+
+.chart-active-point {
+  fill: var(--accent);
+  stroke: var(--surface-strong);
+  stroke-width: 3;
+  vector-effect: non-scaling-stroke;
+}
+
+.chart-tooltip rect {
+  fill: var(--ink);
+}
+
+.chart-tooltip text {
+  fill: var(--surface-strong);
+  font-size: 12px;
+  font-weight: 620;
+}
+
+.chart-tooltip .chart-tooltip-value {
+  fill: var(--accent);
+  font-size: 17px;
+  font-weight: 820;
+}
+
 .full-list,
 .completed-list {
   display: grid;
@@ -1453,6 +1552,15 @@ h1 {
 
   .home-heading {
     margin-bottom: 30px;
+  }
+
+  .statistics-heading {
+    margin-bottom: 28px;
+  }
+
+  .queue-chart-shell {
+    padding: 8px 6px 4px;
+    border-radius: 16px;
   }
 
   .capture-form {

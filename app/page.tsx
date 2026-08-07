@@ -2,6 +2,8 @@
 
 import {
   FormEvent,
+  KeyboardEvent as ReactKeyboardEvent,
+  PointerEvent as ReactPointerEvent,
   useCallback,
   useEffect,
   useMemo,
@@ -25,7 +27,7 @@ type StoredThoughts = {
   thoughts: Thought[];
 };
 
-type View = "review" | "all" | "done";
+type View = "review" | "all" | "done" | "stats";
 type AuthState =
   | "checking"
   | "authenticated"
@@ -38,9 +40,15 @@ type AddedFeedback = {
   text: string;
 };
 
+type QueueHistoryPoint = {
+  date: Date;
+  count: number;
+};
+
 const STORAGE_KEY = "and-1-more-thing:v1";
 const MIGRATION_KEY = "and-1-more-thing:sqlite-migrated:v1";
 const QUEUE_SIZE = 5;
+const STATISTICS_DAYS = 30;
 const EXAMPLE_ROTATION_MS = 4200;
 const THOUGHT_EXAMPLES = [
   "np. Sprawdzić, czy OC jest opłacone",
@@ -52,6 +60,14 @@ const THOUGHT_EXAMPLES = [
 
 const relativeTimeFormatter = new Intl.RelativeTimeFormat("pl-PL", {
   numeric: "always",
+});
+const chartAxisDateFormatter = new Intl.DateTimeFormat("pl-PL", {
+  day: "numeric",
+  month: "short",
+});
+const chartTooltipDateFormatter = new Intl.DateTimeFormat("pl-PL", {
+  day: "numeric",
+  month: "long",
 });
 
 function isThought(value: unknown): value is Thought {
@@ -118,6 +134,38 @@ function formatRelativeTime(value: string, currentTime: number) {
 
 function thoughtSortValue(thought: Thought) {
   return new Date(thought.lastPresentedAt ?? thought.createdAt).getTime();
+}
+
+function buildQueueHistory(
+  thoughts: Thought[],
+  currentTime: number,
+): QueueHistoryPoint[] {
+  const today = new Date(currentTime);
+  today.setHours(0, 0, 0, 0);
+
+  return Array.from({ length: STATISTICS_DAYS }, (_, index) => {
+    const date = new Date(today);
+    date.setDate(today.getDate() - (STATISTICS_DAYS - index - 1));
+
+    const nextDate = new Date(date);
+    nextDate.setDate(date.getDate() + 1);
+    const dayEnd = nextDate.getTime();
+
+    const count = thoughts.filter((thought) => {
+      const createdAt = new Date(thought.createdAt).getTime();
+      const completedAt = thought.completedAt
+        ? new Date(thought.completedAt).getTime()
+        : null;
+
+      return (
+        Number.isFinite(createdAt) &&
+        createdAt < dayEnd &&
+        (completedAt === null || completedAt >= dayEnd)
+      );
+    }).length;
+
+    return { date, count };
+  });
 }
 
 async function readJson<T>(response: Response): Promise<T> {
@@ -587,6 +635,12 @@ export default function Home() {
             symbol="✓"
             onClick={() => setView("done")}
           />
+          <NavButton
+            active={view === "stats"}
+            label="Statystyki"
+            symbol="↗"
+            onClick={() => setView("stats")}
+          />
         </nav>
         <button className="logout-button" type="button" onClick={logout}>
           Wyloguj
@@ -637,6 +691,15 @@ export default function Home() {
                   symbol="✓"
                   onClick={() => {
                     setView("done");
+                    setMobileMenuOpen(false);
+                  }}
+                />
+                <NavButton
+                  active={view === "stats"}
+                  label="Statystyki"
+                  symbol="↗"
+                  onClick={() => {
+                    setView("stats");
                     setMobileMenuOpen(false);
                   }}
                 />
@@ -918,6 +981,22 @@ export default function Home() {
             )}
           </section>
         )}
+
+        {view === "stats" && (
+          <section
+            className="statistics-page"
+            aria-labelledby="statistics-title"
+          >
+            <header className="statistics-heading">
+              <p className="eyebrow">Ostatnie 30 dni</p>
+              <h1 id="statistics-title">Zadania w kolejce</h1>
+            </header>
+            <QueueHistoryChart
+              thoughts={thoughts}
+              currentTime={currentTime}
+            />
+          </section>
+        )}
       </main>
 
       {undoThought && (
@@ -960,6 +1039,197 @@ export default function Home() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+const CHART_WIDTH = 800;
+const CHART_HEIGHT = 440;
+const CHART_PADDING = { top: 34, right: 24, bottom: 58, left: 56 };
+
+function QueueHistoryChart({
+  thoughts,
+  currentTime,
+}: {
+  thoughts: Thought[];
+  currentTime: number;
+}) {
+  const data = useMemo(
+    () => buildQueueHistory(thoughts, currentTime),
+    [thoughts, currentTime],
+  );
+  const [selectedIndex, setSelectedIndex] = useState(data.length - 1);
+  const plotWidth = CHART_WIDTH - CHART_PADDING.left - CHART_PADDING.right;
+  const plotHeight = CHART_HEIGHT - CHART_PADDING.top - CHART_PADDING.bottom;
+  const chartBottom = CHART_PADDING.top + plotHeight;
+  const maxCount = Math.max(1, ...data.map((point) => point.count));
+  const ceiling = Math.max(4, Math.ceil(maxCount / 4) * 4);
+  const points = data.map((point, index) => ({
+    ...point,
+    x:
+      CHART_PADDING.left +
+      (index / Math.max(1, data.length - 1)) * plotWidth,
+    y: CHART_PADDING.top + (1 - point.count / ceiling) * plotHeight,
+  }));
+  const activePoint = points[selectedIndex] ?? points[points.length - 1];
+  const linePath = points
+    .map((point, index) => `${index === 0 ? "M" : "L"} ${point.x} ${point.y}`)
+    .join(" ");
+  const areaPath = `${linePath} L ${points[points.length - 1].x} ${chartBottom} L ${points[0].x} ${chartBottom} Z`;
+  const yTicks = Array.from({ length: 5 }, (_, index) =>
+    Math.round((ceiling / 4) * index),
+  );
+  const dateLabelIndices = new Set(
+    Array.from({ length: 5 }, (_, index) =>
+      Math.round(((data.length - 1) / 4) * index),
+    ),
+  );
+  const tooltipWidth = 170;
+  const tooltipHeight = 64;
+  const tooltipX = Math.min(
+    CHART_WIDTH - CHART_PADDING.right - tooltipWidth,
+    Math.max(CHART_PADDING.left, activePoint.x - tooltipWidth / 2),
+  );
+  const tooltipY =
+    activePoint.y - tooltipHeight - 16 > 8
+      ? activePoint.y - tooltipHeight - 16
+      : activePoint.y + 16;
+
+  function selectClosestPoint(event: ReactPointerEvent<SVGSVGElement>) {
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const pointerX =
+      ((event.clientX - bounds.left) / Math.max(1, bounds.width)) * CHART_WIDTH;
+    const ratio = (pointerX - CHART_PADDING.left) / plotWidth;
+    const nextIndex = Math.round(ratio * (data.length - 1));
+    setSelectedIndex(Math.max(0, Math.min(data.length - 1, nextIndex)));
+  }
+
+  function moveSelection(event: ReactKeyboardEvent<SVGSVGElement>) {
+    if (event.key === "ArrowLeft" || event.key === "ArrowDown") {
+      event.preventDefault();
+      setSelectedIndex((index) => Math.max(0, index - 1));
+    }
+    if (event.key === "ArrowRight" || event.key === "ArrowUp") {
+      event.preventDefault();
+      setSelectedIndex((index) => Math.min(data.length - 1, index + 1));
+    }
+    if (event.key === "Home") {
+      event.preventDefault();
+      setSelectedIndex(0);
+    }
+    if (event.key === "End") {
+      event.preventDefault();
+      setSelectedIndex(data.length - 1);
+    }
+  }
+
+  return (
+    <div className="queue-chart-shell">
+      <svg
+        className="queue-chart"
+        viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`}
+        role="img"
+        tabIndex={0}
+        aria-label={`Liczba zadań w kolejce, ${chartTooltipDateFormatter.format(activePoint.date)}: ${activePoint.count}. Użyj strzałek, aby zmienić dzień.`}
+        onPointerMove={selectClosestPoint}
+        onPointerDown={selectClosestPoint}
+        onKeyDown={moveSelection}
+      >
+        <defs>
+          <linearGradient id="queue-chart-area" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="var(--accent)" stopOpacity="0.34" />
+            <stop offset="100%" stopColor="var(--accent)" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+
+        {yTicks.map((tick) => {
+          const y = CHART_PADDING.top + (1 - tick / ceiling) * plotHeight;
+          return (
+            <g key={tick}>
+              <line
+                className="chart-grid-line"
+                x1={CHART_PADDING.left}
+                x2={CHART_WIDTH - CHART_PADDING.right}
+                y1={y}
+                y2={y}
+              />
+              <text
+                className="chart-axis-label"
+                x={CHART_PADDING.left - 13}
+                y={y + 5}
+                textAnchor="end"
+              >
+                {tick}
+              </text>
+            </g>
+          );
+        })}
+
+        {points.map((point, index) =>
+          dateLabelIndices.has(index) ? (
+            <text
+              className="chart-axis-label"
+              key={point.date.toISOString()}
+              x={point.x}
+              y={CHART_HEIGHT - 19}
+              textAnchor={
+                index === 0
+                  ? "start"
+                  : index === points.length - 1
+                    ? "end"
+                    : "middle"
+              }
+            >
+              {chartAxisDateFormatter.format(point.date)}
+            </text>
+          ) : null,
+        )}
+
+        <path className="chart-area" d={areaPath} />
+        <path className="chart-line" d={linePath} />
+        <rect
+          className="chart-interaction-layer"
+          x={CHART_PADDING.left}
+          y={CHART_PADDING.top}
+          width={plotWidth}
+          height={plotHeight}
+        />
+        <line
+          className="chart-crosshair"
+          x1={activePoint.x}
+          x2={activePoint.x}
+          y1={CHART_PADDING.top}
+          y2={chartBottom}
+        />
+        <circle
+          className="chart-active-point-halo"
+          cx={activePoint.x}
+          cy={activePoint.y}
+          r="10"
+        />
+        <circle
+          className="chart-active-point"
+          cx={activePoint.x}
+          cy={activePoint.y}
+          r="5"
+        />
+
+        <g className="chart-tooltip" pointerEvents="none">
+          <rect
+            x={tooltipX}
+            y={tooltipY}
+            width={tooltipWidth}
+            height={tooltipHeight}
+            rx="12"
+          />
+          <text x={tooltipX + 14} y={tooltipY + 25}>
+            {chartTooltipDateFormatter.format(activePoint.date)}
+          </text>
+          <text className="chart-tooltip-value" x={tooltipX + 14} y={tooltipY + 49}>
+            {activePoint.count} w kolejce
+          </text>
+        </g>
+      </svg>
     </div>
   );
 }
