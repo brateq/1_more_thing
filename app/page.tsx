@@ -617,21 +617,18 @@ export default function Home() {
           <NavButton
             active={view === "review"}
             label="Kolejka"
-            count={activeThoughts.length}
             symbol="○"
             onClick={() => setView("review")}
           />
           <NavButton
             active={view === "all"}
             label="Wszystkie"
-            count={activeThoughts.length}
             symbol="≡"
             onClick={() => setView("all")}
           />
           <NavButton
             active={view === "done"}
             label="Załatwione"
-            count={completedThoughts.length}
             symbol="✓"
             onClick={() => setView("done")}
           />
@@ -667,7 +664,6 @@ export default function Home() {
                 <NavButton
                   active={view === "review"}
                   label="Przejrzyj"
-                  count={activeThoughts.length}
                   symbol="○"
                   onClick={() => {
                     setView("review");
@@ -677,7 +673,6 @@ export default function Home() {
                 <NavButton
                   active={view === "all"}
                   label="Wszystkie"
-                  count={activeThoughts.length}
                   symbol="≡"
                   onClick={() => {
                     setView("all");
@@ -687,7 +682,6 @@ export default function Home() {
                 <NavButton
                   active={view === "done"}
                   label="Załatwione"
-                  count={completedThoughts.length}
                   symbol="✓"
                   onClick={() => {
                     setView("done");
@@ -1313,13 +1307,11 @@ function AccessScreen({
 function NavButton({
   active,
   label,
-  count,
   symbol,
   onClick,
 }: {
   active: boolean;
   label: string;
-  count?: number;
   symbol: string;
   onClick: () => void;
 }) {
@@ -1334,7 +1326,6 @@ function NavButton({
         {symbol}
       </span>
       <span>{label}</span>
-      {typeof count === "number" && <span className="nav-count">{count}</span>}
     </button>
   );
 }

@@ -225,23 +225,6 @@ input:focus-visible {
   line-height: 1;
 }
 
-.nav-count {
-  min-width: 20px;
-  height: 20px;
-  padding: 0 5px;
-  border-radius: 99px;
-  display: grid;
-  place-items: center;
-  background: var(--soft);
-  color: var(--muted);
-  font-size: 9px;
-}
-
-.nav-button.active .nav-count {
-  background: rgba(13, 16, 12, 0.12);
-  color: var(--accent-ink);
-}
-
 .logout-button {
   min-height: 38px;
   padding: 0 10px;
@@ -1495,10 +1478,6 @@ h1 {
   .mobile-menu-panel .nav-symbol {
     width: 20px;
     text-align: center;
-  }
-
-  .mobile-menu-panel .nav-count {
-    margin-left: auto;
   }
 
   .mobile-logout-button {

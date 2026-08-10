@@ -42,6 +42,8 @@ test("supports automatic dark mode and clear capture feedback", async () => {
   assert.match(page, /sqlite-migrated/);
   assert.match(page, /aria-expanded=\{mobileMenuOpen\}/);
   assert.match(page, /Główna nawigacja mobilna/);
+  assert.doesNotMatch(page, /nav-count|count=\{/);
+  assert.doesNotMatch(styles, /\.nav-count/);
   assert.doesNotMatch(page, /className="mobile-nav"/);
   assert.match(styles, /\.mobile-menu-panel/);
   assert.doesNotMatch(page, /Tu nic nie jest pilne|Jedno zdanie wystarczy/);
