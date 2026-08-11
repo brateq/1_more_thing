@@ -36,6 +36,7 @@ test("supports automatic dark mode and clear capture feedback", async () => {
   assert.match(page, /Intl\.RelativeTimeFormat\("pl-PL"/);
   assert.match(page, /THOUGHT_EXAMPLES/);
   assert.match(page, /Kupić chleb po pracy/);
+  assert.match(page, /autoCapitalize="sentences"/);
   assert.match(page, /prefers-reduced-motion: reduce/);
   assert.match(page, /Dodane do poczekalni/);
   assert.match(page, /\/api\/thoughts/);

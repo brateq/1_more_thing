@@ -788,6 +788,7 @@ export default function Home() {
                     onChange={(event) => setDraft(event.target.value)}
                     maxLength={280}
                     autoComplete="off"
+                    autoCapitalize="sentences"
                     aria-label="Myśl do zapisania"
                   />
                   {draft.length === 0 && (
