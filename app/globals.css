@@ -772,7 +772,7 @@ h1 {
 }
 
 .thought-body p,
-.list-row-copy p,
+.editable-thought-text,
 .completed-row p {
   margin: 0;
   color: var(--ink);
@@ -782,7 +782,28 @@ h1 {
   letter-spacing: -0.035em;
 }
 
-.thought-card:first-child .thought-body p {
+.editable-thought-text {
+  max-width: 100%;
+  padding: 2px 4px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  display: block;
+  overflow-wrap: anywhere;
+  text-align: left;
+  cursor: text;
+  transition: background 160ms ease;
+}
+
+.editable-thought-text:hover {
+  background: var(--soft);
+}
+
+.editable-thought-text.completed {
+  color: var(--completed);
+}
+
+.thought-card:first-child .editable-thought-text {
   max-width: none;
   color: var(--ink);
   font-size: 20px;
@@ -1186,6 +1207,11 @@ h1 {
   cursor: pointer;
   font-size: 10px;
   font-weight: 800;
+}
+
+.small-primary:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
 }
 
 .completed-row {

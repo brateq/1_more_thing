@@ -540,23 +540,66 @@ export default function Home() {
     setEditingText(thought.text);
   }
 
+  function cancelEditing() {
+    setEditingId(null);
+    setEditingText("");
+  }
+
   function saveEdit(event: FormEvent, id: string) {
     event.preventDefault();
     const text = editingText.trim();
     if (!text) return;
+
+    const existingThought = thoughts.find((thought) => thought.id === id);
+    if (existingThought?.text === text) {
+      cancelEditing();
+      return;
+    }
 
     setThoughts((current) =>
       current.map((thought) =>
         thought.id === id ? { ...thought, text } : thought,
       ),
     );
-    setEditingId(null);
-    setEditingText("");
+    cancelEditing();
     void synchronize(`/api/thoughts/${encodeURIComponent(id)}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ text }),
     });
+  }
+
+  function renderThoughtEditor(thought: Thought) {
+    return (
+      <form
+        className="edit-form"
+        onSubmit={(event) => saveEdit(event, thought.id)}
+      >
+        <label htmlFor={`edit-${thought.id}`}>Edytuj treść zadania</label>
+        <input
+          id={`edit-${thought.id}`}
+          value={editingText}
+          onChange={(event) => setEditingText(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Escape") cancelEditing();
+          }}
+          maxLength={280}
+          autoFocus
+        />
+        <div className="edit-actions">
+          <button
+            type="submit"
+            className="small-primary"
+            disabled={!editingText.trim()}
+          >
+            Zapisz
+          </button>
+          <button type="button" className="text-button" onClick={cancelEditing}>
+            Anuluj
+          </button>
+        </div>
+      </form>
+    );
   }
 
   function deleteThought() {
@@ -805,11 +848,28 @@ export default function Home() {
                         {String(index + 1).padStart(2, "0")}
                       </span>
                       <div className="thought-body">
-                        <p>{thought.text}</p>
-                        <span>
-                          Zapisano{" "}
-                          {formatRelativeTime(thought.createdAt, currentTime)}
-                        </span>
+                        {editingId === thought.id ? (
+                          renderThoughtEditor(thought)
+                        ) : (
+                          <>
+                            <button
+                              type="button"
+                              className="editable-thought-text"
+                              onClick={() => beginEditing(thought)}
+                              aria-label={`Edytuj zadanie: ${thought.text}`}
+                              title="Kliknij, aby edytować"
+                            >
+                              {thought.text}
+                            </button>
+                            <span>
+                              Zapisano{" "}
+                              {formatRelativeTime(
+                                thought.createdAt,
+                                currentTime,
+                              )}
+                            </span>
+                          </>
+                        )}
                       </div>
                       <div className="thought-actions">
                         <button
@@ -859,39 +919,19 @@ export default function Home() {
                 {allActive.map((thought) => (
                   <article className="list-row" key={thought.id}>
                     {editingId === thought.id ? (
-                      <form
-                        className="edit-form"
-                        onSubmit={(event) => saveEdit(event, thought.id)}
-                      >
-                        <label htmlFor={`edit-${thought.id}`}>
-                          Popraw treść myśli
-                        </label>
-                        <input
-                          id={`edit-${thought.id}`}
-                          value={editingText}
-                          onChange={(event) =>
-                            setEditingText(event.target.value)
-                          }
-                          maxLength={280}
-                          autoFocus
-                        />
-                        <div className="edit-actions">
-                          <button type="submit" className="small-primary">
-                            Zapisz
-                          </button>
-                          <button
-                            type="button"
-                            className="text-button"
-                            onClick={() => setEditingId(null)}
-                          >
-                            Anuluj
-                          </button>
-                        </div>
-                      </form>
+                      renderThoughtEditor(thought)
                     ) : (
                       <>
                         <div className="list-row-copy">
-                          <p>{thought.text}</p>
+                          <button
+                            type="button"
+                            className="editable-thought-text"
+                            onClick={() => beginEditing(thought)}
+                            aria-label={`Edytuj zadanie: ${thought.text}`}
+                            title="Kliknij, aby edytować"
+                          >
+                            {thought.text}
+                          </button>
                           <span>
                             Zapisano{" "}
                             {formatRelativeTime(thought.createdAt, currentTime)}
@@ -946,14 +986,28 @@ export default function Home() {
                       ✓
                     </span>
                     <div>
-                      <p>{thought.text}</p>
-                      <span>
-                        Załatwiono{" "}
-                        {formatRelativeTime(
-                          thought.completedAt ?? thought.createdAt,
-                          currentTime,
-                        )}
-                      </span>
+                      {editingId === thought.id ? (
+                        renderThoughtEditor(thought)
+                      ) : (
+                        <>
+                          <button
+                            type="button"
+                            className="editable-thought-text completed"
+                            onClick={() => beginEditing(thought)}
+                            aria-label={`Edytuj zadanie: ${thought.text}`}
+                            title="Kliknij, aby edytować"
+                          >
+                            {thought.text}
+                          </button>
+                          <span>
+                            Załatwiono{" "}
+                            {formatRelativeTime(
+                              thought.completedAt ?? thought.createdAt,
+                              currentTime,
+                            )}
+                          </span>
+                        </>
+                      )}
                     </div>
                     <button
                       type="button"

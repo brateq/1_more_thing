@@ -42,6 +42,10 @@ test("supports automatic dark mode and clear capture feedback", async () => {
   assert.match(page, /sqlite-migrated/);
   assert.match(page, /aria-expanded=\{mobileMenuOpen\}/);
   assert.match(page, /Główna nawigacja mobilna/);
+  assert.match(page, /className="editable-thought-text"/);
+  assert.match(page, /Kliknij, aby edytować/);
+  assert.match(page, /if \(event\.key === "Escape"\) cancelEditing\(\)/);
+  assert.match(styles, /\.editable-thought-text:hover/);
   assert.doesNotMatch(page, /nav-count|count=\{/);
   assert.doesNotMatch(styles, /\.nav-count/);
   assert.doesNotMatch(page, /className="mobile-nav"/);
