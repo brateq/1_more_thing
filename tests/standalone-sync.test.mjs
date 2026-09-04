@@ -107,7 +107,7 @@ test("persists and protects synchronized thoughts in standalone mode", async (t)
   };
   const created = await fetch(`${baseUrl}/api/thoughts`, {
     method: "POST",
-    headers: { "Content-Type": "application/json", Cookie: cookie },
+    headers: { "Content-Type": "application/json", Cookie: cookie, "Idempotency-Key": "create-test" },
     body: JSON.stringify({ thought }),
   });
   assert.equal(created.status, 201, await created.text());
@@ -115,7 +115,7 @@ test("persists and protects synchronized thoughts in standalone mode", async (t)
   const completedAt = new Date().toISOString();
   const updated = await fetch(`${baseUrl}/api/thoughts/${thought.id}`, {
     method: "PATCH",
-    headers: { "Content-Type": "application/json", Cookie: cookie },
+    headers: { "Content-Type": "application/json", Cookie: cookie, "Idempotency-Key": "complete-test" },
     body: JSON.stringify({ status: "done", completedAt }),
   });
   assert.equal(updated.status, 200, await updated.text());
@@ -128,9 +128,44 @@ test("persists and protects synchronized thoughts in standalone mode", async (t)
   assert.equal(body.thoughts.length, 1);
   assert.equal(body.thoughts[0].status, "done");
 
+  const replayCreate = await fetch(`${baseUrl}/api/thoughts`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Cookie: cookie, "Idempotency-Key": "create-test" },
+    body: JSON.stringify({ thought }),
+  });
+  assert.equal(replayCreate.status, 201);
+  const collision = await fetch(`${baseUrl}/api/thoughts`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Cookie: cookie, "Idempotency-Key": "create-test" },
+    body: JSON.stringify({ thought: { ...thought, text: "Different operation" } }),
+  });
+  assert.equal(collision.status, 409);
+
+  const restored = await fetch(`${baseUrl}/api/thoughts/${thought.id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", Cookie: cookie },
+    body: JSON.stringify({ status: "active", completedAt: null }),
+  });
+  assert.equal(restored.status, 200);
+  const replayComplete = await fetch(`${baseUrl}/api/thoughts/${thought.id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", Cookie: cookie, "Idempotency-Key": "complete-test" },
+    body: JSON.stringify({ status: "done", completedAt }),
+  });
+  assert.equal(replayComplete.status, 200);
+  const afterReplay = await fetch(`${baseUrl}/api/thoughts`, { headers: { Cookie: cookie } });
+  const replayBody = await afterReplay.json();
+  assert.equal(replayBody.thoughts.length, 1);
+  assert.equal(replayBody.thoughts[0].status, "active", "an old retry must not overwrite a later change");
+
   const deleted = await fetch(`${baseUrl}/api/thoughts/${thought.id}`, {
     method: "DELETE",
-    headers: { Cookie: cookie },
+    headers: { Cookie: cookie, "Idempotency-Key": "delete-test" },
   });
   assert.equal(deleted.status, 204);
+  const replayDelete = await fetch(`${baseUrl}/api/thoughts/${thought.id}`, {
+    method: "DELETE",
+    headers: { Cookie: cookie, "Idempotency-Key": "delete-test" },
+  });
+  assert.equal(replayDelete.status, 204);
 });

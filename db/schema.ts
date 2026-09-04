@@ -20,3 +20,10 @@ export const thoughts = sqliteTable(
 );
 
 export type ThoughtRecord = typeof thoughts.$inferSelect;
+
+export const mutationReceipts = sqliteTable("mutation_receipts", {
+  id: text("id").primaryKey(),
+  fingerprint: text("fingerprint").notNull(),
+  status: integer("status").notNull(),
+  body: text("body"),
+});

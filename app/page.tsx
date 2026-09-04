@@ -10,6 +10,10 @@ import {
   useRef,
   useState,
 } from "react";
+import {
+  applyOutbox, DRAFT_KEY, enqueueMutation, flushOutbox,
+  OUTBOX_PREFIX, readOutbox, SyncError, type ThoughtMutation,
+} from "@/lib/thought-outbox";
 
 type ThoughtStatus = "active" | "done";
 
@@ -182,6 +186,10 @@ export default function Home() {
   const [draft, setDraft] = useState("");
   const [hydrated, setHydrated] = useState(false);
   const [saveError, setSaveError] = useState(false);
+  const [storageError, setStorageError] = useState(false);
+  const [pendingCount, setPendingCount] = useState(0);
+  const [syncing, setSyncing] = useState(false);
+  const [offline, setOffline] = useState(false);
   const [undoThought, setUndoThought] = useState<Thought | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState("");
@@ -200,20 +208,64 @@ export default function Home() {
   const mobileMenuButtonRef = useRef<HTMLButtonElement>(null);
   const undoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const addedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const mutationQueue = useRef<Promise<void>>(Promise.resolve());
+  const synchronization = useRef<Promise<void> | null>(null);
+  const authenticated = useRef(false);
+  const revision = useRef(0);
+  const refreshSequence = useRef(0);
 
   const refreshThoughts = useCallback(async () => {
-    const response = await fetch("/api/thoughts", { cache: "no-store" });
+    const sequence = ++refreshSequence.current;
+    const startingRevision = revision.current;
+    const response = await fetch("/api/thoughts", {
+      cache: "no-store", signal: AbortSignal.timeout(15_000),
+    });
     if (response.status === 401) {
+      authenticated.current = false;
       setAuthState("anonymous");
       throw new Error("Unauthorized");
     }
 
     const body = await readJson<{ thoughts: unknown[] }>(response);
-    setThoughts(body.thoughts.filter(isThought));
+    if (!authenticated.current || sequence !== refreshSequence.current || startingRevision !== revision.current) return;
+    const pending = readOutbox(window.localStorage);
+    setThoughts(applyOutbox(body.thoughts.filter(isThought), pending));
+    setPendingCount(pending.length);
     setCurrentTime(Date.now());
-    setSaveError(false);
   }, []);
+
+  const synchronizePending = useCallback(() => {
+    if (synchronization.current) return synchronization.current;
+    if (!authenticated.current) return Promise.resolve();
+    const run = async () => {
+      setSyncing(true);
+      try {
+        const drain = async () => {
+          do {
+            await flushOutbox(window.localStorage, fetch, () => {
+              revision.current++;
+              setPendingCount(readOutbox(window.localStorage).length);
+            }, () => authenticated.current);
+            if (authenticated.current) await refreshThoughts();
+          } while (authenticated.current && readOutbox(window.localStorage).length > 0);
+        };
+        // Only one tab sends this device's queue at a time.
+        if (navigator.locks) await navigator.locks.request("and1-sync", drain);
+        else await drain();
+        setSaveError(false);
+      } catch (error) {
+        setSaveError(true);
+        if (error instanceof SyncError && error.status === 401) {
+          authenticated.current = false;
+          setAuthState("anonymous");
+        }
+      } finally {
+        setSyncing(false);
+        synchronization.current = null;
+      }
+    };
+    synchronization.current = run();
+    return synchronization.current;
+  }, [refreshThoughts]);
 
   const loadSynchronizedThoughts = useCallback(async () => {
     const migrationDone = window.localStorage.getItem(MIGRATION_KEY) === "1";
@@ -232,12 +284,19 @@ export default function Home() {
     window.localStorage.setItem(MIGRATION_KEY, "1");
     await refreshThoughts();
     setHydrated(true);
-  }, [refreshThoughts]);
+    void synchronizePending();
+  }, [refreshThoughts, synchronizePending]);
 
   useEffect(() => {
     let active = true;
 
     async function initialize() {
+      try {
+        setDraft(window.localStorage.getItem(DRAFT_KEY) ?? "");
+        setPendingCount(readOutbox(window.localStorage).length);
+      } catch {
+        setStorageError(true);
+      }
       try {
         const response = await fetch("/api/auth/session", {
           cache: "no-store",
@@ -257,6 +316,7 @@ export default function Home() {
           return;
         }
 
+        authenticated.current = true;
         setAuthState("authenticated");
         await loadSynchronizedThoughts();
       } catch {
@@ -271,21 +331,59 @@ export default function Home() {
   }, [loadSynchronizedThoughts]);
 
   useEffect(() => {
-    if (authState !== "authenticated") return;
+    if (authState !== "authenticated" || !hydrated) return;
 
+    const updateConnection = () => {
+      setOffline(!navigator.onLine);
+      if (navigator.onLine) void synchronizePending();
+    };
     const refreshWhenVisible = () => {
       if (document.visibilityState === "visible") {
-        void refreshThoughts().catch(() => setSaveError(true));
+        updateConnection();
+      }
+    };
+    const updateFromOtherTab = (event: StorageEvent) => {
+      if (event.key?.startsWith(OUTBOX_PREFIX)) {
+        try {
+          const pending = readOutbox(window.localStorage);
+          revision.current++;
+          setPendingCount(pending.length);
+          setThoughts((current) => applyOutbox(current, pending));
+          void synchronizePending();
+        } catch { setStorageError(true); }
       }
     };
 
+    updateConnection();
+    const retryTimer = window.setInterval(refreshWhenVisible, 15_000);
+    window.addEventListener("online", updateConnection);
+    window.addEventListener("offline", updateConnection);
+    window.addEventListener("storage", updateFromOtherTab);
     window.addEventListener("focus", refreshWhenVisible);
     document.addEventListener("visibilitychange", refreshWhenVisible);
     return () => {
+      window.clearInterval(retryTimer);
+      window.removeEventListener("online", updateConnection);
+      window.removeEventListener("offline", updateConnection);
+      window.removeEventListener("storage", updateFromOtherTab);
       window.removeEventListener("focus", refreshWhenVisible);
       document.removeEventListener("visibilitychange", refreshWhenVisible);
     };
-  }, [authState, refreshThoughts]);
+  }, [authState, hydrated, synchronizePending]);
+
+  useEffect(() => {
+    const quickCapture = (event: KeyboardEvent) => {
+      if (authState !== "authenticated" || deleteTarget) return;
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        setMobileMenuOpen(false);
+        inputRef.current?.focus();
+        inputRef.current?.scrollIntoView({ block: "center", behavior: "instant" });
+      }
+    };
+    window.addEventListener("keydown", quickCapture);
+    return () => window.removeEventListener("keydown", quickCapture);
+  }, [authState, deleteTarget]);
 
   useEffect(() => {
     return () => {
@@ -377,21 +475,28 @@ export default function Home() {
     [thoughts],
   );
 
-  function synchronize(url: string, init: RequestInit) {
-    mutationQueue.current = mutationQueue.current
-      .then(async () => {
-        const response = await fetch(url, init);
-        if (response.status === 401) {
-          setAuthState("anonymous");
-          throw new Error("Unauthorized");
-        }
-        if (!response.ok) throw new Error("Synchronization failed");
-        setSaveError(false);
-      })
-      .catch(async () => {
-        setSaveError(true);
-        await refreshThoughts().catch(() => undefined);
-      });
+  function saveMutation(mutation: Omit<ThoughtMutation, "id" | "order">) {
+    try {
+      const entry = enqueueMutation(window.localStorage, mutation);
+      revision.current++;
+      setThoughts((current) => applyOutbox(current, [entry]));
+      setPendingCount(readOutbox(window.localStorage).length);
+      setStorageError(false);
+      void synchronizePending();
+      return true;
+    } catch {
+      setStorageError(true);
+      return false;
+    }
+  }
+
+  function updateDraft(text: string) {
+    setDraft(text);
+    try {
+      if (text) window.localStorage.setItem(DRAFT_KEY, text);
+      else window.localStorage.removeItem(DRAFT_KEY);
+      setStorageError(false);
+    } catch { setStorageError(true); }
   }
 
   async function submitLogin(event: FormEvent) {
@@ -418,6 +523,7 @@ export default function Home() {
 
       setLoginPassword("");
       setHydrated(false);
+      authenticated.current = true;
       setAuthState("authenticated");
       await loadSynchronizedThoughts();
     } catch {
@@ -429,6 +535,8 @@ export default function Home() {
   }
 
   async function logout() {
+    authenticated.current = false;
+    refreshSequence.current++;
     setMobileMenuOpen(false);
     await fetch("/api/auth/logout", { method: "POST" }).catch(() => undefined);
     setThoughts([]);
@@ -454,17 +562,13 @@ export default function Home() {
       completedAt: null,
     };
 
-    setThoughts((current) => [thought, ...current]);
-    setDraft("");
+    if (!saveMutation({ method: "POST", thought })) return;
+    updateDraft("");
     setCurrentTime(new Date(now).getTime());
     setAddedFeedback({ id: thought.id, text: thought.text });
     if (addedTimer.current) clearTimeout(addedTimer.current);
     addedTimer.current = setTimeout(() => setAddedFeedback(null), 2800);
-    void synchronize("/api/thoughts", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ thought }),
-    });
+    inputRef.current?.focus();
   }
 
   function completeThought(id: string) {
@@ -472,65 +576,31 @@ export default function Home() {
     if (!thought) return;
 
     const completedAt = new Date().toISOString();
-    setThoughts((current) =>
-      current.map((item) =>
-        item.id === id ? { ...item, status: "done", completedAt } : item,
-      ),
-    );
+    if (!saveMutation({ method: "PATCH", thought, changes: { status: "done", completedAt } })) return;
 
     setUndoThought(thought);
     if (undoTimer.current) clearTimeout(undoTimer.current);
     undoTimer.current = setTimeout(() => setUndoThought(null), 6000);
-    void synchronize(`/api/thoughts/${encodeURIComponent(id)}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status: "done", completedAt }),
-    });
   }
 
   function deferThought(id: string) {
+    const thought = thoughts.find((item) => item.id === id);
+    if (!thought) return;
     const deferredAt = new Date().toISOString();
-    setThoughts((current) =>
-      current.map((thought) =>
-        thought.id === id
-          ? { ...thought, lastPresentedAt: deferredAt }
-          : thought,
-      ),
-    );
-    void synchronize(`/api/thoughts/${encodeURIComponent(id)}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ lastPresentedAt: deferredAt }),
-    });
+    saveMutation({ method: "PATCH", thought, changes: { lastPresentedAt: deferredAt } });
   }
 
   function restoreThought(id: string) {
-    setThoughts((current) =>
-      current.map((thought) =>
-        thought.id === id
-          ? {
-              ...thought,
-              status: "active",
-              completedAt: null,
-              lastPresentedAt: null,
-            }
-          : thought,
-      ),
-    );
-    void synchronize(`/api/thoughts/${encodeURIComponent(id)}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        status: "active",
-        completedAt: null,
-        lastPresentedAt: null,
-      }),
-    });
+    const thought = thoughts.find((item) => item.id === id);
+    if (!thought) return false;
+    return saveMutation({ method: "PATCH", thought, changes: {
+      status: "active", completedAt: null, lastPresentedAt: null,
+    } });
   }
 
   function undoCompletion() {
     if (!undoThought) return;
-    restoreThought(undoThought.id);
+    if (!restoreThought(undoThought.id)) return;
     setUndoThought(null);
     if (undoTimer.current) clearTimeout(undoTimer.current);
   }
@@ -556,17 +626,8 @@ export default function Home() {
       return;
     }
 
-    setThoughts((current) =>
-      current.map((thought) =>
-        thought.id === id ? { ...thought, text } : thought,
-      ),
-    );
+    if (!existingThought || !saveMutation({ method: "PATCH", thought: existingThought, changes: { text } })) return;
     cancelEditing();
-    void synchronize(`/api/thoughts/${encodeURIComponent(id)}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text }),
-    });
   }
 
   function renderThoughtEditor(thought: Thought) {
@@ -604,13 +665,7 @@ export default function Home() {
 
   function deleteThought() {
     if (!deleteTarget) return;
-    setThoughts((current) =>
-      current.filter((thought) => thought.id !== deleteTarget.id),
-    );
-    void synchronize(
-      `/api/thoughts/${encodeURIComponent(deleteTarget.id)}`,
-      { method: "DELETE" },
-    );
+    if (!saveMutation({ method: "DELETE", thought: deleteTarget })) return;
     setDeleteTarget(null);
   }
 
@@ -682,6 +737,20 @@ export default function Home() {
             onClick={() => setView("stats")}
           />
         </nav>
+        <button
+          className="quick-add-button"
+          type="button"
+          aria-label="Dodaj myśl"
+          aria-keyshortcuts="Meta+k Control+k"
+          title="Dodaj myśl (⌘K / Ctrl+K)"
+          onClick={() => {
+            setMobileMenuOpen(false);
+            inputRef.current?.focus();
+            inputRef.current?.scrollIntoView({ block: "center", behavior: "instant" });
+          }}
+        >
+          +
+        </button>
         <button className="logout-button" type="button" onClick={logout}>
           Wyloguj
         </button>
@@ -754,10 +823,10 @@ export default function Home() {
       </header>
 
       <main className="main-content">
-        {saveError && (
+        {storageError && (
           <div className="save-alert" role="alert">
-            Nie udało się zsynchronizować ostatniej zmiany. Przywrócono dane
-            zapisane na serwerze.
+            Nie udało się zapisać danych na tym urządzeniu. Zachowaj wpisaną treść
+            i sprawdź dostępne miejsce oraz ustawienia pamięci przeglądarki.
           </div>
         )}
 
@@ -772,11 +841,12 @@ export default function Home() {
           </div>
         )}
 
-        {view === "review" && (
-          <>
+        <div className={view === "review" ? "capture-section" : "capture-section compact"}>
+          {view === "review" ? (
             <header className="page-heading home-heading">
               <h1>Co jeszcze chodzi Ci po głowie?</h1>
             </header>
+          ) : <label className="capture-label" htmlFor="thought-input">Co jeszcze chodzi Ci po głowie?</label>}
 
             <form className="capture-form" onSubmit={submitThought}>
               <div className="capture-row">
@@ -785,7 +855,7 @@ export default function Home() {
                     ref={inputRef}
                     id="thought-input"
                     value={draft}
-                    onChange={(event) => setDraft(event.target.value)}
+                    onChange={(event) => updateDraft(event.target.value)}
                     maxLength={280}
                     autoComplete="off"
                     autoCapitalize="sentences"
@@ -801,12 +871,26 @@ export default function Home() {
                     </span>
                   )}
                 </div>
-                <button type="submit" aria-label="Zapisz myśl">
+                <button type="submit" aria-label="Zapisz myśl" disabled={!draft.trim() || !hydrated}>
                   <span aria-hidden="true">{addedFeedback ? "✓" : "+"}</span>
                   {addedFeedback ? "Dodane" : "Zostaw tutaj"}
                 </button>
               </div>
             </form>
+
+            <div className="sync-status" role="status" aria-live="polite">
+              <span>{pendingCount > 0
+                ? `Zapisane na tym urządzeniu. ${syncing && !offline ? "Synchronizuję" : "Czeka na synchronizację"}: ${pendingCount}.`
+                : offline ? "Brak połączenia. Nowe myśli zapiszą się na tym urządzeniu."
+                : saveError ? "Nie udało się odświeżyć listy. Spróbuję ponownie."
+                : syncing ? "Synchronizuję…" : hydrated ? "Zsynchronizowano" : "Wczytuję…"}
+              </span>
+              {(pendingCount > 0 || saveError) && (
+                <button type="button" className="text-button" disabled={syncing} onClick={() => void synchronizePending()}>
+                  Spróbuj teraz
+                </button>
+              )}
+            </div>
 
             {addedFeedback && (
               <div
@@ -824,7 +908,10 @@ export default function Home() {
                 </span>
               </div>
             )}
+        </div>
 
+        {view === "review" && (
+          <>
             <section className="review-section" aria-labelledby="review-title">
               <div className="section-heading">
                 <div>
@@ -939,6 +1026,13 @@ export default function Home() {
                           </span>
                         </div>
                         <div className="row-actions">
+                          <button
+                            type="button"
+                            className="small-primary"
+                            onClick={() => completeThought(thought.id)}
+                          >
+                            ✓ Załatwione
+                          </button>
                           <button
                             type="button"
                             className="text-button"

@@ -4,6 +4,26 @@ Spokojna, responsywna aplikacja webowa do odkładania na później myśli, któr
 niepotrzebnie zajmują głowę. Dane są przechowywane w centralnej bazie SQLite i
 synchronizują się po zalogowaniu na każdym urządzeniu.
 
+## Codzienne korzystanie
+
+- Myśl możesz dodać z każdego widoku. Przycisk **+** w nagłówku albo
+  **⌘K / Ctrl+K** przenosi kursor do pola dodawania, a Enter zapisuje wpis.
+- Widok **Wszystkie** pozwala także oznaczyć myśl jako załatwioną.
+- Szkic zapisuje się automatycznie w tej przeglądarce i wraca po odświeżeniu.
+- Dodawanie, edycja, odkładanie, załatwianie, przywracanie i usuwanie najpierw
+  trafiają do trwałej lokalnej kolejki. Komunikat pod polem odróżnia zapis na
+  urządzeniu od potwierdzonej synchronizacji z serwerem.
+- Po problemach z połączeniem aplikacja ponawia synchronizację po odzyskaniu
+  sieci, powrocie do karty oraz co 15 sekund, gdy karta jest widoczna.
+  Możesz też użyć **Spróbuj teraz**. Oczekujące zmiany przetrwają zamknięcie
+  karty i zostaną wysłane po ponownym otwarciu aplikacji i zalogowaniu.
+
+To obsługa utraty połączenia w otwartej aplikacji; pierwsze otwarcie strony
+nadal wymaga dostępu do serwera. Szkic i oczekujące zmiany są lokalne dla
+przeglądarki — usunięcie jej danych usuwa również te jeszcze niewysłane dane.
+Potwierdzenia operacji w SQLite chronią przed ich ponownym wykonaniem, gdy
+odpowiedź serwera zaginie. Migracje bazy wykonują się automatycznie przy starcie.
+
 ## Wymagania lokalne
 
 - Node.js `>=22.13.0`

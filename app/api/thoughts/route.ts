@@ -2,6 +2,7 @@ import { desc } from "drizzle-orm";
 import { thoughts } from "@/db/schema";
 import { isAuthenticated, unauthorizedResponse } from "@/lib/auth";
 import { getDatabase } from "@/lib/database";
+import { respondToMutation } from "@/lib/idempotency";
 import {
   parseThought,
   toDatabaseThought,
@@ -39,16 +40,18 @@ export async function POST(request: Request) {
     return Response.json({ error: "invalid_thought" }, { status: 400 });
   }
 
-  const inserted = getDatabase()
-    .insert(thoughts)
-    .values(toDatabaseThought(thought))
-    .onConflictDoNothing()
-    .returning()
-    .get();
+  return respondToMutation(request, thought, () => {
+    const inserted = getDatabase()
+      .insert(thoughts)
+      .values(toDatabaseThought(thought))
+      .onConflictDoNothing()
+      .returning()
+      .get();
 
-  if (!inserted) {
-    return Response.json({ error: "already_exists" }, { status: 409 });
-  }
+    if (!inserted) {
+      return { status: 409, body: { error: "already_exists" } };
+    }
 
-  return Response.json({ thought: toThoughtPayload(inserted) }, { status: 201 });
+    return { status: 201, body: { thought: toThoughtPayload(inserted) } };
+  });
 }

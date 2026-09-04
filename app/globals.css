@@ -243,6 +243,43 @@ input:focus-visible {
   color: var(--ink);
 }
 
+.quick-add-button {
+  flex: 0 0 auto;
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: 11px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  cursor: pointer;
+  font-size: 25px;
+}
+
+.quick-add-button:hover { background: var(--accent-hover); }
+
+.capture-section.compact { margin-bottom: 48px; }
+
+.capture-label {
+  display: block;
+  margin-bottom: 14px;
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.sync-status {
+  min-height: 38px;
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+button:disabled { cursor: default; opacity: 0.55; }
+
 .main-content {
   width: min(calc(100% - 56px), 1080px);
   min-height: calc(100vh - 92px);
@@ -1436,9 +1473,11 @@ h1 {
 
   .mobile-menu {
     position: relative;
-    margin-left: auto;
+    margin-left: 0;
     display: block;
   }
+
+  .quick-add-button { margin-left: auto; }
 
   .menu-toggle {
     width: 42px;

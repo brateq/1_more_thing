@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import { thoughts } from "@/db/schema";
 import { isAuthenticated, unauthorizedResponse } from "@/lib/auth";
 import { getDatabase } from "@/lib/database";
+import { respondToMutation } from "@/lib/idempotency";
 import { toThoughtPayload, type ThoughtStatus } from "@/lib/thoughts";
 
 export const dynamic = "force-dynamic";
@@ -34,6 +35,10 @@ export async function PATCH(request: Request, context: RouteContext) {
     updatedAt: Date;
   } = { updatedAt: new Date() };
 
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    return Response.json({ error: "invalid_request" }, { status: 400 });
+  }
+
   if ("text" in body) {
     const text = typeof body.text === "string" ? body.text.trim() : "";
     if (!text || text.length > 280) {
@@ -63,26 +68,30 @@ export async function PATCH(request: Request, context: RouteContext) {
     return Response.json({ error: "empty_update" }, { status: 400 });
   }
 
-  const updated = getDatabase()
-    .update(thoughts)
-    .set(update)
-    .where(eq(thoughts.id, id))
-    .returning()
-    .get();
+  return respondToMutation(request, body, () => {
+    const updated = getDatabase()
+      .update(thoughts)
+      .set(update)
+      .where(eq(thoughts.id, id))
+      .returning()
+      .get();
 
-  if (!updated) return Response.json({ error: "not_found" }, { status: 404 });
-  return Response.json({ thought: toThoughtPayload(updated) });
+    if (!updated) return { status: 404, body: { error: "not_found" } };
+    return { status: 200, body: { thought: toThoughtPayload(updated) } };
+  });
 }
 
 export async function DELETE(request: Request, context: RouteContext) {
   if (!isAuthenticated(request)) return unauthorizedResponse();
   const { id } = await context.params;
-  const deleted = getDatabase()
-    .delete(thoughts)
-    .where(eq(thoughts.id, id))
-    .returning({ id: thoughts.id })
-    .get();
+  return respondToMutation(request, null, () => {
+    const deleted = getDatabase()
+      .delete(thoughts)
+      .where(eq(thoughts.id, id))
+      .returning({ id: thoughts.id })
+      .get();
 
-  if (!deleted) return Response.json({ error: "not_found" }, { status: 404 });
-  return new Response(null, { status: 204 });
+    if (!deleted) return { status: 404, body: { error: "not_found" } };
+    return { status: 204 };
+  });
 }
