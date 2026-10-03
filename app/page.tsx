@@ -11,17 +11,11 @@ import {
   applyOutbox, DRAFT_KEY, enqueueMutation, flushOutbox,
   OUTBOX_PREFIX, readOutbox, SyncError, type ThoughtMutation,
 } from "@/lib/thought-outbox";
-
-type ThoughtStatus = "active" | "done";
-
-type Thought = {
-  id: string;
-  text: string;
-  status: ThoughtStatus;
-  createdAt: string;
-  lastPresentedAt: string | null;
-  completedAt: string | null;
-};
+import {
+  cacheAcknowledgedMutation, OFFLINE_LOCK_KEY, readThoughtSnapshot,
+  SNAPSHOT_KEY, writeThoughtSnapshot,
+} from "@/lib/thought-cache";
+import { isThought, type ThoughtPayload as Thought } from "@/lib/thoughts";
 
 type StoredThoughts = {
   version: 1;
@@ -70,21 +64,6 @@ const chartTooltipDateFormatter = new Intl.DateTimeFormat("pl-PL", {
   day: "numeric",
   month: "long",
 });
-
-function isThought(value: unknown): value is Thought {
-  if (!value || typeof value !== "object") return false;
-  const thought = value as Partial<Thought>;
-
-  return (
-    typeof thought.id === "string" &&
-    typeof thought.text === "string" &&
-    (thought.status === "active" || thought.status === "done") &&
-    typeof thought.createdAt === "string" &&
-    (thought.lastPresentedAt === null ||
-      typeof thought.lastPresentedAt === "string") &&
-    (thought.completedAt === null || typeof thought.completedAt === "string")
-  );
-}
 
 function readStoredThoughts(): Thought[] {
   try {
@@ -186,7 +165,12 @@ export default function Home() {
   const [hydrated, setHydrated] = useState(false);
   const [saveError, setSaveError] = useState(false);
   const [storageError, setStorageError] = useState(false);
-  const [pendingCount, setPendingCount] = useState(0);
+  const [pendingMutations, setPendingMutations] = useState<ThoughtMutation[]>([]);
+  const pendingCount = pendingMutations.length;
+  const pendingThoughtIds = useMemo(
+    () => new Set(pendingMutations.map((mutation) => mutation.thought.id)),
+    [pendingMutations],
+  );
   const [syncing, setSyncing] = useState(false);
   const [offline, setOffline] = useState(false);
   const [undoThought, setUndoThought] = useState<Thought | null>(null);
@@ -212,6 +196,37 @@ export default function Home() {
   const revision = useRef(0);
   const refreshSequence = useRef(0);
 
+  const lockOfflineAccess = useCallback((state: "anonymous" | "misconfigured" = "anonymous") => {
+    authenticated.current = false;
+    refreshSequence.current++;
+    try {
+      window.localStorage.setItem(OFFLINE_LOCK_KEY, "1");
+    } catch { setStorageError(true); }
+    setThoughts([]);
+    setHydrated(false);
+    setAuthState(state);
+  }, []);
+
+  const openCachedThoughts = useCallback(() => {
+    try {
+      if (window.localStorage.getItem(OFFLINE_LOCK_KEY) === "1") return false;
+      const cached = readThoughtSnapshot(window.localStorage);
+      if (cached === null) return false;
+      const pending = readOutbox(window.localStorage);
+      setThoughts(applyOutbox(cached, pending));
+      setPendingMutations(pending);
+      authenticated.current = true;
+      setAuthState("authenticated");
+      setHydrated(true);
+      setOffline(!navigator.onLine);
+      setSaveError(true);
+      return true;
+    } catch {
+      setStorageError(true);
+      return false;
+    }
+  }, []);
+
   const refreshThoughts = useCallback(async () => {
     const sequence = ++refreshSequence.current;
     const startingRevision = revision.current;
@@ -219,22 +234,25 @@ export default function Home() {
       cache: "no-store", signal: AbortSignal.timeout(15_000),
     });
     if (response.status === 401) {
-      authenticated.current = false;
-      setAuthState("anonymous");
-      throw new Error("Unauthorized");
+      lockOfflineAccess();
+      throw new SyncError(401);
     }
 
     const body = await readJson<{ thoughts: unknown[] }>(response);
     if (!authenticated.current || sequence !== refreshSequence.current || startingRevision !== revision.current) return;
     const pending = readOutbox(window.localStorage);
-    setThoughts(applyOutbox(body.thoughts.filter(isThought), pending));
-    setPendingCount(pending.length);
+    const confirmed = body.thoughts.filter(isThought);
+    try {
+      writeThoughtSnapshot(window.localStorage, confirmed);
+    } catch { setStorageError(true); }
+    setThoughts(applyOutbox(confirmed, pending));
+    setPendingMutations(pending);
     setCurrentTime(Date.now());
-  }, []);
+  }, [lockOfflineAccess]);
 
   const synchronizePending = useCallback(() => {
     if (synchronization.current) return synchronization.current;
-    if (!authenticated.current) return Promise.resolve();
+    if (!authenticated.current || !navigator.onLine) return Promise.resolve();
     const run = async () => {
       setSyncing(true);
       try {
@@ -242,8 +260,15 @@ export default function Home() {
           do {
             await flushOutbox(window.localStorage, fetch, () => {
               revision.current++;
-              setPendingCount(readOutbox(window.localStorage).length);
-            }, () => authenticated.current);
+              setPendingMutations(readOutbox(window.localStorage));
+            }, () => authenticated.current, (mutation) => {
+              try {
+                cacheAcknowledgedMutation(window.localStorage, mutation);
+              } catch (error) {
+                setStorageError(true);
+                throw error;
+              }
+            });
             if (authenticated.current) await refreshThoughts();
           } while (authenticated.current && readOutbox(window.localStorage).length > 0);
         };
@@ -254,8 +279,7 @@ export default function Home() {
       } catch (error) {
         setSaveError(true);
         if (error instanceof SyncError && error.status === 401) {
-          authenticated.current = false;
-          setAuthState("anonymous");
+          lockOfflineAccess();
         }
       } finally {
         setSyncing(false);
@@ -264,7 +288,7 @@ export default function Home() {
     };
     synchronization.current = run();
     return synchronization.current;
-  }, [refreshThoughts]);
+  }, [refreshThoughts, lockOfflineAccess]);
 
   const loadSynchronizedThoughts = useCallback(async () => {
     const migrationDone = window.localStorage.getItem(MIGRATION_KEY) === "1";
@@ -282,7 +306,9 @@ export default function Home() {
 
     window.localStorage.setItem(MIGRATION_KEY, "1");
     await refreshThoughts();
+    if (!authenticated.current) return;
     setHydrated(true);
+    setSaveError(false);
     if (readOutbox(window.localStorage).length > 0) void synchronizePending();
   }, [refreshThoughts, synchronizePending]);
 
@@ -292,13 +318,22 @@ export default function Home() {
     async function initialize() {
       try {
         setDraft(window.localStorage.getItem(DRAFT_KEY) ?? "");
-        setPendingCount(readOutbox(window.localStorage).length);
+        setPendingMutations(readOutbox(window.localStorage));
+        // Also respect an offline logout whose cookie could not yet be cleared.
+        if (window.localStorage.getItem(OFFLINE_LOCK_KEY) === "1") {
+          setAuthState("anonymous");
+          return;
+        }
       } catch {
         setStorageError(true);
       }
       try {
+        if (!navigator.onLine) {
+          if (!openCachedThoughts()) setAuthState("error");
+          return;
+        }
         const response = await fetch("/api/auth/session", {
-          cache: "no-store",
+          cache: "no-store", signal: AbortSignal.timeout(5_000),
         });
         const session = await readJson<{
           authenticated: boolean;
@@ -307,19 +342,21 @@ export default function Home() {
         if (!active) return;
 
         if (!session.configured) {
-          setAuthState("misconfigured");
+          lockOfflineAccess("misconfigured");
           return;
         }
         if (!session.authenticated) {
-          setAuthState("anonymous");
+          if (readThoughtSnapshot(window.localStorage) !== null) lockOfflineAccess();
+          else setAuthState("anonymous");
           return;
         }
 
         authenticated.current = true;
         setAuthState("authenticated");
         await loadSynchronizedThoughts();
-      } catch {
-        if (active) setAuthState("error");
+      } catch (error) {
+        if (!active || (error instanceof SyncError && error.status === 401)) return;
+        if (!openCachedThoughts()) setAuthState("error");
       }
     }
 
@@ -327,7 +364,7 @@ export default function Home() {
     return () => {
       active = false;
     };
-  }, [loadSynchronizedThoughts]);
+  }, [loadSynchronizedThoughts, openCachedThoughts, lockOfflineAccess]);
 
   useEffect(() => {
     if (authState !== "authenticated" || !hydrated) return;
@@ -342,13 +379,18 @@ export default function Home() {
       }
     };
     const updateFromOtherTab = (event: StorageEvent) => {
-      if (event.key?.startsWith(OUTBOX_PREFIX)) {
+      if (event.key === OFFLINE_LOCK_KEY && event.newValue === "1") {
+        lockOfflineAccess();
+        return;
+      }
+      if (event.key === SNAPSHOT_KEY || event.key?.startsWith(OUTBOX_PREFIX)) {
         try {
           const pending = readOutbox(window.localStorage);
+          const cached = readThoughtSnapshot(window.localStorage);
           revision.current++;
-          setPendingCount(pending.length);
-          setThoughts((current) => applyOutbox(current, pending));
-          void synchronizePending();
+          setPendingMutations(pending);
+          setThoughts((current) => applyOutbox(cached ?? current, pending));
+          if (event.key !== SNAPSHOT_KEY) void synchronizePending();
         } catch { setStorageError(true); }
       }
     };
@@ -369,7 +411,7 @@ export default function Home() {
       window.removeEventListener("focus", refreshWhenVisible);
       document.removeEventListener("visibilitychange", refreshWhenVisible);
     };
-  }, [authState, hydrated, synchronizePending]);
+  }, [authState, hydrated, synchronizePending, lockOfflineAccess]);
 
   useEffect(() => {
     const quickCapture = (event: KeyboardEvent) => {
@@ -489,7 +531,7 @@ export default function Home() {
       const entry = enqueueMutation(window.localStorage, mutation);
       revision.current++;
       setThoughts((current) => applyOutbox(current, [entry]));
-      setPendingCount(readOutbox(window.localStorage).length);
+      setPendingMutations(readOutbox(window.localStorage));
       setStorageError(false);
       void synchronizePending();
       return true;
@@ -519,6 +561,7 @@ export default function Home() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ password: loginPassword }),
+        signal: AbortSignal.timeout(15_000),
       });
 
       if (response.status === 429) {
@@ -532,11 +575,12 @@ export default function Home() {
 
       setLoginPassword("");
       setHydrated(false);
+      window.localStorage.removeItem(OFFLINE_LOCK_KEY);
       authenticated.current = true;
       setAuthState("authenticated");
       await loadSynchronizedThoughts();
     } catch {
-      setAuthState("error");
+      if (authenticated.current && !openCachedThoughts()) setAuthState("error");
       setLoginError("Nie udało się połączyć z aplikacją.");
     } finally {
       setLoginBusy(false);
@@ -544,13 +588,11 @@ export default function Home() {
   }
 
   async function logout() {
-    authenticated.current = false;
-    refreshSequence.current++;
+    lockOfflineAccess();
     setMobileMenuOpen(false);
-    await fetch("/api/auth/logout", { method: "POST" }).catch(() => undefined);
-    setThoughts([]);
-    setHydrated(false);
-    setAuthState("anonymous");
+    await fetch("/api/auth/logout", {
+      method: "POST", signal: AbortSignal.timeout(5_000),
+    }).catch(() => undefined);
   }
 
   function submitThought(event: JSX.TargetedEvent<HTMLFormElement>) {
@@ -687,7 +729,7 @@ export default function Home() {
   }
 
   if (authState === "error") {
-    return <AccessScreen mode="error" />;
+    return <AccessScreen mode={navigator.onLine ? "error" : "offline"} />;
   }
 
   if (authState === "anonymous") {
@@ -906,10 +948,13 @@ export default function Home() {
             </form>
 
             <div className="sync-status" role="status" aria-live="polite">
+              {(pendingCount > 0 || offline || saveError) && (
+                <SyncIcon offline={offline && pendingCount === 0} />
+              )}
               <span>{pendingCount > 0
                 ? `Zapisane na tym urządzeniu. ${syncing && !offline ? "Synchronizuję" : "Czeka na synchronizację"}: ${pendingCount}.`
                 : offline ? "Brak połączenia. Nowe myśli zapiszą się na tym urządzeniu."
-                : saveError ? "Nie udało się odświeżyć listy. Spróbuję ponownie."
+                : saveError ? "Pokazuję zapisane dane. Czekam na synchronizację."
                 : syncing ? "Synchronizuję…" : hydrated ? "Zsynchronizowano" : "Wczytuję…"}
               </span>
               {(pendingCount > 0 || saveError) && (
@@ -976,12 +1021,13 @@ export default function Home() {
                             >
                               {thought.text}
                             </button>
-                            <span>
+                            <span className="thought-meta">
                               Zapisano{" "}
                               {formatRelativeTime(
                                 thought.createdAt,
                                 currentTime,
                               )}
+                              {pendingThoughtIds.has(thought.id) && <SyncIcon />}
                             </span>
                           </>
                         )}
@@ -1047,9 +1093,10 @@ export default function Home() {
                           >
                             {thought.text}
                           </button>
-                          <span>
+                          <span className="thought-meta">
                             Zapisano{" "}
                             {formatRelativeTime(thought.createdAt, currentTime)}
+                            {pendingThoughtIds.has(thought.id) && <SyncIcon />}
                           </span>
                         </div>
                         <div className="row-actions">
@@ -1121,12 +1168,13 @@ export default function Home() {
                           >
                             {thought.text}
                           </button>
-                          <span>
+                          <span className="thought-meta">
                             Załatwiono{" "}
                             {formatRelativeTime(
                               thought.completedAt ?? thought.createdAt,
                               currentTime,
                             )}
+                            {pendingThoughtIds.has(thought.id) && <SyncIcon />}
                           </span>
                         </>
                       )}
@@ -1214,6 +1262,24 @@ export default function Home() {
         </div>
       )}
     </div>
+  );
+}
+
+function SyncIcon({ offline = false }: { offline?: boolean }) {
+  const label = offline ? "Brak połączenia" : "Oczekuje na synchronizację";
+  return (
+    <svg className="sync-icon" viewBox="0 0 24 24" width="20" height="20"
+      fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"
+      stroke-linejoin="round" role="img" aria-label={label}>
+      <title>{label}</title>
+      <path d="M8 17H6a4 4 0 0 1-.5-7.97A6.5 6.5 0 0 1 18 7.5a4.5 4.5 0 0 1 3.5 4.4" />
+      {offline ? <path d="m3 3 18 18M11 17h6" /> : (
+        <>
+          <circle cx="16.5" cy="16.5" r="4.5" />
+          <path d="M16.5 14v2.5l1.5 1" />
+        </>
+      )}
+    </svg>
   );
 }
 
@@ -1454,7 +1520,7 @@ function LoginScreen({
 function AccessScreen({
   mode,
 }: {
-  mode: "loading" | "misconfigured" | "error";
+  mode: "loading" | "misconfigured" | "error" | "offline";
 }) {
   const content = {
     loading: {
@@ -1468,6 +1534,10 @@ function AccessScreen({
     error: {
       title: "Nie udało się otworzyć aplikacji.",
       copy: "Sprawdź połączenie i spróbuj odświeżyć stronę.",
+    },
+    offline: {
+      title: "Połącz się, żeby zacząć.",
+      copy: "Zaloguj się raz z dostępem do internetu, aby zapisać listę na tym urządzeniu i korzystać z niej offline.",
     },
   }[mode];
 

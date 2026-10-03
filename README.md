@@ -15,9 +15,22 @@ zbudowania frontendu i uruchamiania testów.
 - Szkic i kolejka zmian zapisują się w `localStorage`. Zmiany są usuwane
   z kolejki dopiero po potwierdzeniu serwera. Synchronizacja wraca po odzyskaniu
   sieci, powrocie do karty, co 15 sekund lub przez **Spróbuj teraz**.
+- Ikona chmury z zegarem oznacza zmiany oczekujące na synchronizację. Jest
+  widoczna przy statusie aplikacji oraz przy zmienionych myślach, także na liście
+  załatwionych. Znika po potwierdzeniu zapisu. Przekreślona chmura oznacza brak sieci.
 
-Otwarcie i odświeżenie aplikacji nadal wymaga dostępu do serwera. Usunięcie danych
-przeglądarki usuwa również niewysłane zmiany i szkic.
+Po pierwszym zalogowaniu online i zapisaniu plików aplikacji przez service worker
+można ją otwierać i odświeżać bez internetu. Dostępna jest ostatnia lokalna kopia
+listy wraz z niewysłanymi zmianami; dodawanie, edycja i pozostałe operacje działają
+offline. Powrót połączenia uruchamia synchronizację. Przy niedostępnym serwerze
+aplikacja również korzysta z zapisanej kopii i pokazuje stan oczekiwania.
+
+Wylogowanie blokuje dostęp do lokalnej listy, również offline i w innych otwartych
+kartach. Niewysłane zmiany i szkic pozostają do kolejnego logowania online.
+Jeżeli serwer zgłosi wygaśnięcie sesji, ponowne logowanie jest wymagane przed
+dalszą synchronizacją. Lokalna kopia nie jest szyfrowana; korzystaj z własnego
+profilu przeglądarki. Usunięcie danych witryny usuwa również kopię offline,
+niewysłane zmiany i szkic.
 
 ## Instalacja jako PWA
 
@@ -38,11 +51,17 @@ Instalacja wymaga **HTTPS**; lokalnie można sprawdzać ją na `localhost`.
 - **Safari na Macu (macOS Sonoma lub nowszy):** **Plik → Dodaj do Docka**.
 - W oknie zainstalowanej aplikacji przycisk instalacji jest ukryty.
 
-Ta wersja dodaje instalację, bez service workera i pełnego startu offline.
-Aktualizacje są pobierane przy kolejnym otwarciu lub odświeżeniu: HTML,
-manifest i ikony wymagają rewalidacji, a pliki JS/CSS mają hashe w nazwach.
+Service worker zapisuje kompletny zestaw publicznych plików jednej wersji:
+HTML, JS, CSS, manifest i ikony. API i odpowiedzi logowania nie trafiają do jego
+cache; lokalna kopia listy i kolejka zmian są przechowywane osobno w `localStorage`.
+Nowa wersja pobiera się w tle podczas otwarcia online. Aby ją uruchomić, zamknij
+wszystkie karty i okna aplikacji, a następnie otwórz ją ponownie. Aktualizacja nie
+podmienia działającej wersji w trakcie wpisywania. `/sw.js` wymaga rewalidacji,
+a pliki JS/CSS mają hashe w nazwach.
 Zainstalowana aplikacja może wymagać ponownego logowania. Lokalny szkic
 i niewysłane zmiany nie muszą być współdzielone z kartą przeglądarki.
+Pełny start offline działa w buildzie produkcyjnym (`npm run build` i `npm start`)
+na HTTPS lub localhost; serwer developerski Vite nie rejestruje service workera.
 
 Ikony bazują na `public/favicon.svg`. Aby je odtworzyć po zmianie SVG,
 uruchom `node scripts/generate-pwa-icons.mjs` (wymagany Chromium Playwrighta).

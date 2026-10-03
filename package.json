@@ -9,7 +9,7 @@
     "dev": "node scripts/dev.mjs",
     "dev:client": "vite --host 127.0.0.1",
     "dev:server": "cargo run --locked",
-    "build:client": "vite build && node scripts/compress.mjs",
+    "build:client": "vite build && node scripts/build-service-worker.mjs && node scripts/compress.mjs",
     "build": "npm run build:client && cargo build --release --locked",
     "start": "./target/release/and1",
     "test": "npm run build && node --test tests/*.test.mjs",

@@ -74,6 +74,7 @@ export async function flushOutbox(
   request: typeof fetch,
   onAcknowledged: () => void = () => {},
   canContinue: () => boolean = () => true,
+  beforeAcknowledged: (mutation: ThoughtMutation) => void = () => {},
 ) {
   while (canContinue()) {
     const mutation = readOutbox(storage)[0];
@@ -93,6 +94,7 @@ export async function flushOutbox(
       throw new SyncError(response.status);
     }
     // Remove only after acknowledgement. A lost response is retried with the same key.
+    beforeAcknowledged(mutation);
     storage.removeItem(OUTBOX_PREFIX + mutation.id);
     onAcknowledged();
   }

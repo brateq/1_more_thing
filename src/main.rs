@@ -71,6 +71,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         ));
     let pages = Router::new()
         .route_service(
+            "/sw.js",
+            ServeFile::new(static_dir.join("sw.js"))
+                .precompressed_br()
+                .precompressed_gzip(),
+        )
+        .route_service(
             "/",
             ServeFile::new(static_dir.join("index.html"))
                 .precompressed_br()

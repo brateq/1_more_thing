@@ -26,6 +26,7 @@
   --toast-bg: #111410;
   --toast-text: #f5f7f2;
   --shadow: 0 24px 80px rgba(35, 42, 31, 0.1);
+  --sync-pending: #95620b;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -55,6 +56,7 @@
     --toast-bg: #eef2eb;
     --toast-text: #121512;
     --shadow: 0 28px 100px rgba(0, 0, 0, 0.3);
+    --sync-pending: #e5b45e;
   }
 }
 
@@ -321,6 +323,14 @@ input:focus-visible {
   font-size: 12px;
   line-height: 1.5;
 }
+
+.sync-icon {
+  flex: 0 0 auto;
+  vertical-align: middle;
+  color: var(--sync-pending);
+}
+
+.sync-status > span { flex: 0 1 auto; }
 
 button:disabled { cursor: default; opacity: 0.55; }
 
@@ -904,6 +914,16 @@ h1 {
 .thought-card:first-child .thought-body span {
   color: var(--muted);
 }
+
+.thought-body .thought-meta,
+.list-row-copy .thought-meta,
+.completed-row div > .thought-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.thought-meta .sync-icon { width: 16px; height: 16px; }
 
 .thought-actions {
   align-self: center;

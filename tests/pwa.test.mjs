@@ -2,6 +2,21 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { startServer } from "./helpers/server.mjs";
 
+test("serves a revalidated worker that precaches only the current public build", async (t) => {
+  const { url } = await startServer(t);
+  const response = await fetch(`${url}/sw.js`);
+  assert.equal(response.status, 200);
+  assert.match(response.headers.get("content-type"), /javascript/);
+  assert.equal(response.headers.get("cache-control"), "no-cache");
+  const worker = await response.text();
+  const assets = JSON.parse(worker.match(/const ASSETS = (.*);/)[1]);
+  assert.ok(assets.includes("/"));
+  assert.ok(assets.some(path => /^\/assets\/.*\.js$/.test(path)));
+  assert.ok(assets.some(path => /^\/assets\/.*\.css$/.test(path)));
+  assert.ok(assets.every(path => !path.startsWith("/api")));
+  for (const path of assets) assert.equal((await fetch(url + path)).status, 200, path);
+});
+
 test("serves an installable manifest and correctly sized icons without requiring login", async (t) => {
   const { url } = await startServer(t);
   const html = await (await fetch(url)).text();

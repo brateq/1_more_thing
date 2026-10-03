@@ -8,6 +8,7 @@ COPY app ./app
 COPY lib ./lib
 COPY public ./public
 COPY scripts/compress.mjs ./scripts/compress.mjs
+COPY scripts/build-service-worker.mjs scripts/service-worker.js ./scripts/
 RUN npm run build:client
 
 FROM rust:1.95-bookworm AS backend
