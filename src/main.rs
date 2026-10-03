@@ -80,6 +80,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             "/favicon.svg",
             ServeFile::new(static_dir.join("favicon.svg")),
         )
+        .route_service(
+            "/manifest.webmanifest",
+            ServeFile::new(static_dir.join("manifest.webmanifest")),
+        )
+        .nest_service("/icons", ServeDir::new(static_dir.join("icons")))
         .fallback(get(|| async { axum::http::StatusCode::NOT_FOUND }))
         .layer(SetResponseHeaderLayer::overriding(
             header::CACHE_CONTROL,

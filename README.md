@@ -16,8 +16,32 @@ zbudowania frontendu i uruchamiania testów.
   z kolejki dopiero po potwierdzeniu serwera. Synchronizacja wraca po odzyskaniu
   sieci, powrocie do karty, co 15 sekund lub przez **Spróbuj teraz**.
 
-Pierwsze otwarcie aplikacji nadal wymaga dostępu do serwera. Usunięcie danych
+Otwarcie i odświeżenie aplikacji nadal wymaga dostępu do serwera. Usunięcie danych
 przeglądarki usuwa również niewysłane zmiany i szkic.
+
+## Instalacja jako PWA
+
+Aplikacja ma manifest, ikony PNG (192 i 512 px), osobną ikonę maskowalną
+Androida i ikonę ekranu początkowego Apple. Uruchamia się w trybie `standalone`.
+Instalacja wymaga **HTTPS**; lokalnie można sprawdzać ją na `localhost`.
+
+- **Chrome / Edge:** użyj przycisku **Zainstaluj** w nagłówku (na telefonie
+  w menu) lub opcji instalacji przeglądarki. Przycisk pojawia się po otrzymaniu
+  `beforeinstallprompt`; przeglądarka decyduje, kiedy instalacja jest dostępna.
+- **iPhone / iPad:** w Safari wybierz **Udostępnij → Do ekranu początkowego**,
+  pozostaw włączone otwieranie jako aplikacji www, jeśli ta opcja jest widoczna,
+  i wybierz **Dodaj**. Przycisk w aplikacji pokazuje te wskazówki.
+- **Safari na Macu (macOS Sonoma lub nowszy):** **Plik → Dodaj do Docka**.
+- W oknie zainstalowanej aplikacji przycisk instalacji jest ukryty.
+
+Ta wersja dodaje instalację, bez service workera i pełnego startu offline.
+Aktualizacje są pobierane przy kolejnym otwarciu lub odświeżeniu: HTML,
+manifest i ikony wymagają rewalidacji, a pliki JS/CSS mają hashe w nazwach.
+Zainstalowana aplikacja może wymagać ponownego logowania. Lokalny szkic
+i niewysłane zmiany nie muszą być współdzielone z kartą przeglądarki.
+
+Ikony bazują na `public/favicon.svg`. Aby je odtworzyć po zmianie SVG,
+uruchom `node scripts/generate-pwa-icons.mjs` (wymagany Chromium Playwrighta).
 
 ## Architektura i wydajność
 

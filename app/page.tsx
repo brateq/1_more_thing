@@ -6,6 +6,7 @@ import {
   useState,
 } from "preact/hooks";
 import type { JSX } from "preact";
+import { InstallationHelp, useAppInstallation } from "./install-app";
 import {
   applyOutbox, DRAFT_KEY, enqueueMutation, flushOutbox,
   OUTBOX_PREFIX, readOutbox, SyncError, type ThoughtMutation,
@@ -178,6 +179,7 @@ async function readJson<T>(response: Response): Promise<T> {
 }
 
 export default function Home() {
+  const installation = useAppInstallation();
   const [thoughts, setThoughts] = useState<Thought[]>([]);
   const [view, setView] = useState<View>("review");
   const [draft, setDraft] = useState("");
@@ -371,7 +373,7 @@ export default function Home() {
 
   useEffect(() => {
     const quickCapture = (event: KeyboardEvent) => {
-      if (authState !== "authenticated" || deleteTarget) return;
+      if (authState !== "authenticated" || deleteTarget || installation.help) return;
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
         event.preventDefault();
         setMobileMenuOpen(false);
@@ -381,7 +383,7 @@ export default function Home() {
     };
     window.addEventListener("keydown", quickCapture);
     return () => window.removeEventListener("keydown", quickCapture);
-  }, [authState, deleteTarget]);
+  }, [authState, deleteTarget, installation.help]);
 
   useEffect(() => {
     return () => {
@@ -702,7 +704,7 @@ export default function Home() {
 
   return (
     <div className="app-shell">
-      <header className="sidebar">
+      <header className={`sidebar${installation.available ? " has-install" : ""}`}>
         <button
           className="brand"
           type="button"
@@ -758,6 +760,11 @@ export default function Home() {
         >
           +
         </button>
+        {installation.available && (
+          <button className="install-button" type="button" onClick={() => void installation.install()}>
+            Zainstaluj
+          </button>
+        )}
         <button className="logout-button" type="button" onClick={logout}>
           Wyloguj
         </button>
@@ -817,6 +824,19 @@ export default function Home() {
                   }}
                 />
               </nav>
+              {installation.available && (
+                <button
+                  className="mobile-install-button"
+                  type="button"
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    mobileMenuButtonRef.current?.focus();
+                    void installation.install();
+                  }}
+                >
+                  Zainstaluj aplikację
+                </button>
+              )}
               <button
                 className="mobile-logout-button"
                 type="button"
@@ -1148,6 +1168,10 @@ export default function Home() {
           </section>
         )}
       </main>
+
+      {installation.help && (
+        <InstallationHelp mode={installation.help} onClose={installation.closeHelp} />
+      )}
 
       {undoThought && (
         <div className="toast" role="status" aria-live="polite">

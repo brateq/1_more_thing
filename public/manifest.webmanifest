@@ -1,0 +1,17 @@
+{
+  "id": "/",
+  "name": "1 more thing",
+  "short_name": "1 more thing",
+  "description": "Zapisz myśl i wróć do niej, kiedy masz na to przestrzeń.",
+  "lang": "pl",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f0f1ec",
+  "theme_color": "#f0f1ec",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
