@@ -5,10 +5,13 @@ type InstallPrompt = Event & {
   prompt: () => Promise<InstallChoice>;
   userChoice: Promise<InstallChoice>;
 };
-type InstallHelp = "ios" | "mac" | "browser";
+type InstallHelp = "ios" | "mac" | "firefox-android" | "browser";
 
-function appleInstallHelp(): InstallHelp | null {
+function manualInstallHelp(): InstallHelp | null {
   const agent = navigator.userAgent;
+  if (/Android/.test(agent) && /Firefox\//.test(agent)) {
+    return "firefox-android";
+  }
   if (/iPad|iPhone|iPod/.test(agent) || (/Macintosh/.test(agent) && navigator.maxTouchPoints > 1)) {
     return "ios";
   }
@@ -23,7 +26,7 @@ export function useAppInstallation() {
   const [canPrompt, setCanPrompt] = useState(false);
   const [installed, setInstalled] = useState(false);
   const [help, setHelp] = useState<InstallHelp | null>(null);
-  const [appleHelp] = useState(appleInstallHelp);
+  const [manualHelp] = useState(manualInstallHelp);
 
   // Subscribe before paint so an early browser prompt is kept during login.
   useLayoutEffect(() => {
@@ -55,7 +58,7 @@ export function useAppInstallation() {
   async function install() {
     const event = deferredPrompt.current;
     if (!event) {
-      setHelp(appleHelp ?? "browser");
+      setHelp(manualHelp ?? "browser");
       return;
     }
     // A browser installation prompt can only be used once, even if dismissed.
@@ -71,7 +74,7 @@ export function useAppInstallation() {
   }
 
   return {
-    available: window.isSecureContext && !installed && (canPrompt || appleHelp !== null),
+    available: window.isSecureContext && !installed && (canPrompt || manualHelp !== null),
     help, install, closeHelp: () => setHelp(null),
   };
 }
@@ -95,6 +98,12 @@ export function InstallationHelp({ mode, onClose }: { mode: InstallHelp; onClose
           <li>W Safari wybierz <strong>Plik → Dodaj do Docka</strong>.</li>
           <li>Potwierdź nazwę i kliknij <strong>Dodaj</strong>.</li>
           <li>Otwieraj aplikację z jej ikony w Docku.</li>
+        </ol>
+      ) : mode === "firefox-android" ? (
+        <ol>
+          <li>Otwórz menu Firefoxa <strong>⋮</strong> przy pasku adresu.</li>
+          <li>Wybierz <strong>Zainstaluj</strong>.</li>
+          <li>Potwierdź dodanie ikony do ekranu głównego. Potem otwieraj aplikację z tej ikony.</li>
         </ol>
       ) : (
         <p>Nie udało się otworzyć okna instalacji. Otwórz menu przeglądarki i wybierz opcję instalowania aplikacji, jeśli jest dostępna.</p>

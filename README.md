@@ -28,6 +28,10 @@ Instalacja wymaga **HTTPS**; lokalnie można sprawdzać ją na `localhost`.
 - **Chrome / Edge:** użyj przycisku **Zainstaluj** w nagłówku (na telefonie
   w menu) lub opcji instalacji przeglądarki. Przycisk pojawia się po otrzymaniu
   `beforeinstallprompt`; przeglądarka decyduje, kiedy instalacja jest dostępna.
+- **Firefox na Androidzie:** wybierz **⋮ → Zainstaluj** w menu przeglądarki
+  i potwierdź dodanie do ekranu głównego. Przycisk **Zainstaluj aplikację**
+  w naszym menu pokazuje instrukcję, ponieważ Firefox nie udostępnia
+  `beforeinstallprompt`.
 - **iPhone / iPad:** w Safari wybierz **Udostępnij → Do ekranu początkowego**,
   pozostaw włączone otwieranie jako aplikacji www, jeśli ta opcja jest widoczna,
   i wybierz **Dodaj**. Przycisk w aplikacji pokazuje te wskazówki.

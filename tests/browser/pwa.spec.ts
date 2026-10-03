@@ -109,3 +109,47 @@ test("hides installation controls when launched standalone on iOS", async ({ pag
   await page.getByRole("button", { name: "Otwórz menu" }).click();
   await expect(page.getByRole("button", { name: /Zainstaluj/ })).toHaveCount(0);
 });
+
+test("Firefox Android offers manual installation without beforeinstallprompt", async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, "userAgent", { value: "Mozilla/5.0 (Android 15; Mobile; rv:143.0) Gecko/143.0 Firefox/143.0" });
+  });
+  await openAuthenticated(page);
+  await page.getByRole("button", { name: "Otwórz menu" }).click();
+  await page.getByRole("button", { name: "Zainstaluj aplikację" }).click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByText(/Otwórz menu Firefoxa/)).toBeVisible();
+  await expect(dialog.getByText("Zainstaluj", { exact: true })).toBeVisible();
+  await expect(dialog.getByText(/Safari|Nie udało się/)).toHaveCount(0);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await page.screenshot({ path: testInfo.outputPath("firefox-android-install-help.png") });
+  await page.getByRole("button", { name: "Rozumiem" }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Otwórz menu" })).toBeFocused();
+});
+
+test("Firefox Android hides installation when launched as an installed app", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, "userAgent", { value: "Mozilla/5.0 (Android 15; Mobile; rv:143.0) Gecko/143.0 Firefox/143.0" });
+    const matchMedia = window.matchMedia.bind(window);
+    window.matchMedia = (query) => {
+      const result = matchMedia(query);
+      if (query === "(display-mode: standalone)") Object.defineProperty(result, "matches", { value: true });
+      return result;
+    };
+  });
+  await openAuthenticated(page);
+  await page.getByRole("button", { name: "Otwórz menu" }).click();
+  await expect(page.getByRole("button", { name: /Zainstaluj/ })).toHaveCount(0);
+});
+
+test("Firefox desktop does not offer Android installation instructions", async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, "userAgent", { value: "Mozilla/5.0 (X11; Linux x86_64; rv:143.0) Gecko/20100101 Firefox/143.0" });
+  });
+  await openAuthenticated(page);
+  await expect(page.getByRole("button", { name: /Zainstaluj/ })).toHaveCount(0);
+});
