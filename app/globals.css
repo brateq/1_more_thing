@@ -1654,21 +1654,35 @@ h1 {
 }
 
 @media (max-width: 680px) {
-  .main-content {
-    padding-top: 52px;
+  .sidebar {
+    height: 64px;
   }
 
-  h1 {
-    font-size: clamp(40px, 11.5vw, 52px);
-    line-height: 0.98;
+  .main-content {
+    min-height: calc(100vh - 64px);
+    padding-top: 24px;
+  }
+
+  .main-content h1 {
+    font-size: clamp(30px, 8.2vw, 40px);
+    line-height: 1.06;
   }
 
   .home-heading {
-    margin-bottom: 30px;
+    margin-bottom: 20px;
+  }
+
+  .capture-section.compact {
+    margin-bottom: 28px;
+  }
+
+  .sync-status {
+    min-height: 28px;
+    margin-top: 8px;
   }
 
   .statistics-heading {
-    margin-bottom: 28px;
+    margin-bottom: 24px;
   }
 
   .queue-chart-shell {
@@ -1712,15 +1726,16 @@ h1 {
   }
 
   .review-section {
-    margin-top: 72px;
+    margin-top: 32px;
   }
 
   .section-heading {
+    margin-bottom: 16px;
     align-items: center;
   }
 
   .section-heading h2 {
-    font-size: 29px;
+    font-size: 25px;
   }
 
   .thought-queue {
@@ -1761,7 +1776,7 @@ h1 {
   }
 
   .list-page .page-heading {
-    margin-bottom: 42px;
+    margin-bottom: 24px;
   }
 
   .list-row {
