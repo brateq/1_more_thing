@@ -1,16 +1,15 @@
-import vinext from "vinext";
+import preact from "@preact/preset-vite";
 import { defineConfig } from "vite";
-import { sites } from "./build/sites-vite-plugin.ts";
-
-// macOS Seatbelt blocks FSEvents, so Codex previews need polling for HMR.
-const isCodexSeatbeltSandbox = process.env.CODEX_SANDBOX === "seatbelt";
+import { fileURLToPath } from "node:url";
 
 export default defineConfig({
-  server: isCodexSeatbeltSandbox
-    ? { watch: { useFsEvents: false, usePolling: true } }
-    : undefined,
-  ssr: {
-    external: ["better-sqlite3"],
+  plugins: [preact()],
+  resolve: { alias: { "@": fileURLToPath(new URL(".", import.meta.url)) } },
+  server: {
+    proxy: {
+      "/api": "http://127.0.0.1:3000",
+      "/health": "http://127.0.0.1:3000",
+    },
   },
-  plugins: [vinext(), sites()],
+  build: { outDir: "dist/client", target: "es2022", cssCodeSplit: false },
 });

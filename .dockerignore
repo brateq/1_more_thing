@@ -11,3 +11,7 @@ work
 .env*
 .DS_Store
 *.log
+target
+data
+test-results
+playwright-report

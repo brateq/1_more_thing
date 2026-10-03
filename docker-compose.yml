@@ -6,11 +6,9 @@ services:
     restart: unless-stopped
     init: true
     environment:
-      NODE_ENV: production
       HOST: 0.0.0.0
       PORT: "3000"
       DATABASE_PATH: /app/data/and1.db
-      MIGRATIONS_PATH: /app/drizzle
       AUTH_PASSWORD_HASH: ${AUTH_PASSWORD_HASH:?Set AUTH_PASSWORD_HASH in Dokploy}
       SESSION_SECRET: ${SESSION_SECRET:?Set SESSION_SECRET in Dokploy}
     volumes:
@@ -18,13 +16,7 @@ services:
     expose:
       - "3000"
     healthcheck:
-      test:
-        - CMD
-        - node
-        - -e
-        - >-
-          fetch('http://127.0.0.1:3000/health').then((response) =>
-          process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))
+      test: ["CMD", "and1", "healthcheck"]
       interval: 30s
       timeout: 5s
       start_period: 10s

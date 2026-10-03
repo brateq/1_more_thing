@@ -1,41 +1,34 @@
 {
   "name": "1-more-thing",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "engines": {
     "node": ">=22.13.0"
   },
   "scripts": {
-    "dev": "vinext dev",
-    "build": "vinext build",
-    "start": "node dist/standalone/server.js",
+    "dev": "node scripts/dev.mjs",
+    "dev:client": "vite --host 127.0.0.1",
+    "dev:server": "cargo run --locked",
+    "build:client": "vite build && node scripts/compress.mjs",
+    "build": "npm run build:client && cargo build --release --locked",
+    "start": "./target/release/and1",
     "test": "npm run build && node --test tests/*.test.mjs",
-    "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
-    "db:generate": "drizzle-kit generate",
-    "auth:hash": "node scripts/hash-password.mjs"
+    "test:browser": "playwright test",
+    "check": "tsc --noEmit && cargo fmt --check && cargo clippy --locked --all-targets -- -D warnings",
+    "auth:hash": "cargo run --quiet --locked -- hash-password",
+    "benchmark": "node scripts/benchmark.mjs",
+    "test:docker": "docker build -t and1:test . && node tests/docker-smoke.mjs"
   },
   "dependencies": {
-    "better-sqlite3": "13.0.3",
-    "drizzle-orm": "0.45.2",
-    "next": "16.3.0",
-    "react": "19.2.8",
-    "react-dom": "19.2.8"
+    "preact": "^10.29.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.58.2",
+    "@preact/preset-vite": "^2.10.2",
     "@tailwindcss/postcss": "4.2.1",
-    "@types/better-sqlite3": "9.6.0",
     "@types/node": "22.19.19",
-    "@types/react": "19.2.14",
-    "@types/react-dom": "19.2.3",
-    "@vitejs/plugin-react": "6.0.2",
-    "@vitejs/plugin-rsc": "0.5.26",
-    "drizzle-kit": "0.31.10",
-    "eslint": "9.39.4",
-    "eslint-config-next": "16.3.0",
-    "react-server-dom-webpack": "19.2.8",
     "tailwindcss": "4.2.1",
     "typescript": "5.9.3",
-    "vinext": "0.0.50",
     "vite": "8.2.1"
   },
   "type": "module"

@@ -1,15 +1,11 @@
-"use client";
-
 import {
-  FormEvent,
-  KeyboardEvent as ReactKeyboardEvent,
-  PointerEvent as ReactPointerEvent,
   useCallback,
   useEffect,
   useMemo,
   useRef,
   useState,
-} from "react";
+} from "preact/hooks";
+import type { JSX } from "preact";
 import {
   applyOutbox, DRAFT_KEY, enqueueMutation, flushOutbox,
   OUTBOX_PREFIX, readOutbox, SyncError, type ThoughtMutation,
@@ -147,6 +143,12 @@ function buildQueueHistory(
   const today = new Date(currentTime);
   today.setHours(0, 0, 0, 0);
 
+  // Parse each timestamp once, rather than twice for each of the 30 days.
+  const intervals = thoughts.map((thought) => ({
+    createdAt: new Date(thought.createdAt).getTime(),
+    completedAt: thought.completedAt ? new Date(thought.completedAt).getTime() : null,
+  }));
+
   return Array.from({ length: STATISTICS_DAYS }, (_, index) => {
     const date = new Date(today);
     date.setDate(today.getDate() - (STATISTICS_DAYS - index - 1));
@@ -155,12 +157,7 @@ function buildQueueHistory(
     nextDate.setDate(date.getDate() + 1);
     const dayEnd = nextDate.getTime();
 
-    const count = thoughts.filter((thought) => {
-      const createdAt = new Date(thought.createdAt).getTime();
-      const completedAt = thought.completedAt
-        ? new Date(thought.completedAt).getTime()
-        : null;
-
+    const count = intervals.filter(({ createdAt, completedAt }) => {
       return (
         Number.isFinite(createdAt) &&
         createdAt < dayEnd &&
@@ -284,7 +281,7 @@ export default function Home() {
     window.localStorage.setItem(MIGRATION_KEY, "1");
     await refreshThoughts();
     setHydrated(true);
-    void synchronizePending();
+    if (readOutbox(window.localStorage).length > 0) void synchronizePending();
   }, [refreshThoughts, synchronizePending]);
 
   useEffect(() => {
@@ -354,7 +351,8 @@ export default function Home() {
       }
     };
 
-    updateConnection();
+    // The initial load already fetched the list. Avoid a second immediate GET.
+    setOffline(!navigator.onLine);
     const retryTimer = window.setInterval(refreshWhenVisible, 15_000);
     window.addEventListener("online", updateConnection);
     window.addEventListener("offline", updateConnection);
@@ -446,33 +444,42 @@ export default function Home() {
     [thoughts],
   );
 
-  const queue = useMemo(
-    () =>
-      [...activeThoughts]
-        .sort((a, b) => thoughtSortValue(a) - thoughtSortValue(b))
-        .slice(0, QUEUE_SIZE),
-    [activeThoughts],
-  );
+  const queue = useMemo(() => {
+    // Only five entries are visible: select them in O(n * 5), without sorting
+    // the entire collection or repeatedly parsing dates in a comparator.
+    const selected: { thought: Thought; time: number }[] = [];
+    for (const thought of activeThoughts) {
+      const time = thoughtSortValue(thought);
+      const index = selected.findIndex((entry) => time < entry.time);
+      if (index === -1) {
+        if (selected.length < QUEUE_SIZE) selected.push({ thought, time });
+      } else {
+        selected.splice(index, 0, { thought, time });
+        if (selected.length > QUEUE_SIZE) selected.pop();
+      }
+    }
+    return selected.map(({ thought }) => thought);
+  }, [activeThoughts]);
 
   const allActive = useMemo(
     () =>
-      [...activeThoughts].sort(
+      view === "all" ? [...activeThoughts].sort(
         (a, b) =>
           new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-      ),
-    [activeThoughts],
+      ) : [],
+    [activeThoughts, view],
   );
 
   const completedThoughts = useMemo(
     () =>
-      thoughts
+      view === "done" ? thoughts
         .filter((thought) => thought.status === "done")
         .sort(
           (a, b) =>
             new Date(b.completedAt ?? 0).getTime() -
             new Date(a.completedAt ?? 0).getTime(),
-        ),
-    [thoughts],
+        ) : [],
+    [thoughts, view],
   );
 
   function saveMutation(mutation: Omit<ThoughtMutation, "id" | "order">) {
@@ -499,7 +506,7 @@ export default function Home() {
     } catch { setStorageError(true); }
   }
 
-  async function submitLogin(event: FormEvent) {
+  async function submitLogin(event: JSX.TargetedEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!loginPassword) return;
 
@@ -544,7 +551,7 @@ export default function Home() {
     setAuthState("anonymous");
   }
 
-  function submitThought(event: FormEvent) {
+  function submitThought(event: JSX.TargetedEvent<HTMLFormElement>) {
     event.preventDefault();
     const text = draft.trim();
     if (!text) {
@@ -615,7 +622,7 @@ export default function Home() {
     setEditingText("");
   }
 
-  function saveEdit(event: FormEvent, id: string) {
+  function saveEdit(event: JSX.TargetedEvent<HTMLFormElement>, id: string) {
     event.preventDefault();
     const text = editingText.trim();
     if (!text) return;
@@ -640,7 +647,7 @@ export default function Home() {
         <input
           id={`edit-${thought.id}`}
           value={editingText}
-          onChange={(event) => setEditingText(event.target.value)}
+          onInput={(event) => setEditingText(event.currentTarget.value)}
           onKeyDown={(event) => {
             if (event.key === "Escape") cancelEditing();
           }}
@@ -855,7 +862,7 @@ export default function Home() {
                     ref={inputRef}
                     id="thought-input"
                     value={draft}
-                    onChange={(event) => updateDraft(event.target.value)}
+                    onInput={(event) => updateDraft(event.currentTarget.value)}
                     maxLength={280}
                     autoComplete="off"
                     autoCapitalize="sentences"
@@ -1238,7 +1245,7 @@ function QueueHistoryChart({
       ? activePoint.y - tooltipHeight - 16
       : activePoint.y + 16;
 
-  function selectClosestPoint(event: ReactPointerEvent<SVGSVGElement>) {
+  function selectClosestPoint(event: JSX.TargetedPointerEvent<SVGSVGElement>) {
     const bounds = event.currentTarget.getBoundingClientRect();
     const pointerX =
       ((event.clientX - bounds.left) / Math.max(1, bounds.width)) * CHART_WIDTH;
@@ -1247,7 +1254,7 @@ function QueueHistoryChart({
     setSelectedIndex(Math.max(0, Math.min(data.length - 1, nextIndex)));
   }
 
-  function moveSelection(event: ReactKeyboardEvent<SVGSVGElement>) {
+  function moveSelection(event: JSX.TargetedKeyboardEvent<SVGSVGElement>) {
     if (event.key === "ArrowLeft" || event.key === "ArrowDown") {
       event.preventDefault();
       setSelectedIndex((index) => Math.max(0, index - 1));
@@ -1280,8 +1287,8 @@ function QueueHistoryChart({
       >
         <defs>
           <linearGradient id="queue-chart-area" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="var(--accent)" stopOpacity="0.34" />
-            <stop offset="100%" stopColor="var(--accent)" stopOpacity="0" />
+            <stop offset="0%" stop-color="var(--accent)" stop-opacity="0.34" />
+            <stop offset="100%" stop-color="var(--accent)" stop-opacity="0" />
           </linearGradient>
         </defs>
 
@@ -1300,7 +1307,7 @@ function QueueHistoryChart({
                 className="chart-axis-label"
                 x={CHART_PADDING.left - 13}
                 y={y + 5}
-                textAnchor="end"
+                text-anchor="end"
               >
                 {tick}
               </text>
@@ -1315,7 +1322,7 @@ function QueueHistoryChart({
               key={point.date.toISOString()}
               x={point.x}
               y={CHART_HEIGHT - 19}
-              textAnchor={
+              text-anchor={
                 index === 0
                   ? "start"
                   : index === points.length - 1
@@ -1357,7 +1364,7 @@ function QueueHistoryChart({
           r="5"
         />
 
-        <g className="chart-tooltip" pointerEvents="none">
+        <g className="chart-tooltip" pointer-events="none">
           <rect
             x={tooltipX}
             y={tooltipY}
@@ -1388,7 +1395,7 @@ function LoginScreen({
   error: string;
   busy: boolean;
   onPasswordChange: (value: string) => void;
-  onSubmit: (event: FormEvent) => void;
+  onSubmit: (event: JSX.TargetedEvent<HTMLFormElement>) => void;
 }) {
   return (
     <main className="access-page">
@@ -1405,7 +1412,7 @@ function LoginScreen({
             id="login-password"
             type="password"
             value={password}
-            onChange={(event) => onPasswordChange(event.target.value)}
+            onInput={(event) => onPasswordChange(event.currentTarget.value)}
             autoComplete="current-password"
             autoFocus
             required

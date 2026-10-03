@@ -45,7 +45,7 @@ test("persists and protects synchronized thoughts in standalone mode", async (t)
   const password = "test-password-123";
   let output = "";
 
-  const server = spawn(process.execPath, ["dist/standalone/server.js"], {
+  const server = spawn(resolve("target/release/and1"), [], {
     cwd: resolve("."),
     env: {
       ...process.env,
