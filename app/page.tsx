@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -162,6 +163,7 @@ export default function Home() {
   const [thoughts, setThoughts] = useState<Thought[]>([]);
   const [view, setView] = useState<View>("review");
   const [draft, setDraft] = useState("");
+  const [captureOpen, setCaptureOpen] = useState(false);
   const [hydrated, setHydrated] = useState(false);
   const [saveError, setSaveError] = useState(false);
   const [storageError, setStorageError] = useState(false);
@@ -187,6 +189,7 @@ export default function Home() {
   const [migrationNotice, setMigrationNotice] = useState<number | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const captureDialogRef = useRef<HTMLDialogElement>(null);
   const mobileMenuRef = useRef<HTMLDivElement>(null);
   const mobileMenuButtonRef = useRef<HTMLButtonElement>(null);
   const undoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -203,6 +206,7 @@ export default function Home() {
       window.localStorage.setItem(OFFLINE_LOCK_KEY, "1");
     } catch { setStorageError(true); }
     setThoughts([]);
+    setCaptureOpen(false);
     setHydrated(false);
     setAuthState(state);
   }, []);
@@ -413,19 +417,24 @@ export default function Home() {
     };
   }, [authState, hydrated, synchronizePending, lockOfflineAccess]);
 
+  useLayoutEffect(() => {
+    if (!captureOpen) return;
+    captureDialogRef.current?.showModal();
+    inputRef.current?.focus();
+  }, [captureOpen]);
+
   useEffect(() => {
     const quickCapture = (event: KeyboardEvent) => {
-      if (authState !== "authenticated" || deleteTarget || installation.help) return;
+      if (authState !== "authenticated" || !hydrated || deleteTarget || installation.help) return;
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
         event.preventDefault();
         setMobileMenuOpen(false);
-        inputRef.current?.focus();
-        inputRef.current?.scrollIntoView({ block: "center", behavior: "instant" });
+        setCaptureOpen(true);
       }
     };
     window.addEventListener("keydown", quickCapture);
     return () => window.removeEventListener("keydown", quickCapture);
-  }, [authState, deleteTarget, installation.help]);
+  }, [authState, hydrated, deleteTarget, installation.help]);
 
   useEffect(() => {
     return () => {
@@ -469,7 +478,7 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    if (draft.length > 0) return;
+    if (!captureOpen || draft.length > 0) return;
 
     const reducedMotion = window.matchMedia(
       "(prefers-reduced-motion: reduce)",
@@ -481,7 +490,7 @@ export default function Home() {
     }, EXAMPLE_ROTATION_MS);
 
     return () => window.clearInterval(exampleTimer);
-  }, [draft]);
+  }, [captureOpen, draft]);
 
   const activeThoughts = useMemo(
     () => thoughts.filter((thought) => thought.status === "active"),
@@ -619,7 +628,12 @@ export default function Home() {
     setAddedFeedback({ id: thought.id, text: thought.text });
     if (addedTimer.current) clearTimeout(addedTimer.current);
     addedTimer.current = setTimeout(() => setAddedFeedback(null), 2800);
-    inputRef.current?.focus();
+    captureDialogRef.current?.close();
+  }
+
+  function openCapture() {
+    setMobileMenuOpen(false);
+    setCaptureOpen(true);
   }
 
   function completeThought(id: string) {
@@ -792,13 +806,12 @@ export default function Home() {
           className="quick-add-button"
           type="button"
           aria-label="Dodaj myśl"
+          aria-haspopup="dialog"
+          aria-controls="capture-dialog"
           aria-keyshortcuts="Meta+k Control+k"
           title="Dodaj myśl (⌘K / Ctrl+K)"
-          onClick={() => {
-            setMobileMenuOpen(false);
-            inputRef.current?.focus();
-            inputRef.current?.scrollIntoView({ block: "center", behavior: "instant" });
-          }}
+          disabled={!hydrated}
+          onClick={openCapture}
         >
           +
         </button>
@@ -891,7 +904,7 @@ export default function Home() {
         </div>
       </header>
 
-      <main className="main-content">
+      <main className={`main-content${view === "review" ? " review-content" : ""}`}>
         {storageError && (
           <div className="save-alert" role="alert">
             Nie udało się zapisać danych na tym urządzeniu. Zachowaj wpisaną treść
@@ -910,76 +923,23 @@ export default function Home() {
           </div>
         )}
 
-        <div className={view === "review" ? "capture-section" : "capture-section compact"}>
-          {view === "review" ? (
-            <header className="page-heading home-heading">
-              <h1>Co jeszcze chodzi Ci po głowie?</h1>
-            </header>
-          ) : <label className="capture-label" htmlFor="thought-input">Co jeszcze chodzi Ci po głowie?</label>}
-
-            <form className="capture-form" onSubmit={submitThought}>
-              <div className="capture-row">
-                <div className="input-shell">
-                  <input
-                    ref={inputRef}
-                    id="thought-input"
-                    value={draft}
-                    onInput={(event) => updateDraft(event.currentTarget.value)}
-                    maxLength={280}
-                    autoComplete="off"
-                    autoCapitalize="sentences"
-                    aria-label="Myśl do zapisania"
-                  />
-                  {draft.length === 0 && (
-                    <span
-                      className="rotating-placeholder"
-                      key={exampleIndex}
-                      aria-hidden="true"
-                    >
-                      {THOUGHT_EXAMPLES[exampleIndex]}
-                    </span>
-                  )}
-                </div>
-                <button type="submit" aria-label="Zapisz myśl" disabled={!draft.trim() || !hydrated}>
-                  <span aria-hidden="true">{addedFeedback ? "✓" : "+"}</span>
-                  {addedFeedback ? "Dodane" : "Zostaw tutaj"}
-                </button>
-              </div>
-            </form>
-
-            <div className="sync-status" role="status" aria-live="polite">
-              {(pendingCount > 0 || offline || saveError) && (
-                <SyncIcon offline={offline && pendingCount === 0} />
-              )}
-              <span>{pendingCount > 0
-                ? `Zapisane na tym urządzeniu. ${syncing && !offline ? "Synchronizuję" : "Czeka na synchronizację"}: ${pendingCount}.`
-                : offline ? "Brak połączenia. Nowe myśli zapiszą się na tym urządzeniu."
-                : saveError ? "Pokazuję zapisane dane. Czekam na synchronizację."
-                : syncing ? "Synchronizuję…" : hydrated ? "Zsynchronizowano" : "Wczytuję…"}
-              </span>
-              {(pendingCount > 0 || saveError) && (
-                <button type="button" className="text-button" disabled={syncing} onClick={() => void synchronizePending()}>
-                  Spróbuj teraz
-                </button>
-              )}
-            </div>
-
-            {addedFeedback && (
-              <div
-                className="add-confirmation"
-                key={addedFeedback.id}
-                role="status"
-                aria-live="polite"
-              >
-                <span className="add-confirmation-mark" aria-hidden="true">
-                  ✓
-                </span>
-                <span>
-                  <strong>Dodane do poczekalni</strong>
-                  {addedFeedback.text}
-                </span>
-              </div>
+        <div className="app-status">
+          <div className="sync-status" role="status" aria-live="polite">
+            {(pendingCount > 0 || offline || saveError) && (
+              <SyncIcon offline={offline && pendingCount === 0} />
             )}
+            <span>{pendingCount > 0
+              ? `Zapisane na tym urządzeniu. ${syncing && !offline ? "Synchronizuję" : "Czeka na synchronizację"}: ${pendingCount}.`
+              : offline ? "Brak połączenia. Nowe myśli zapiszą się na tym urządzeniu."
+              : saveError ? "Pokazuję zapisane dane. Czekam na synchronizację."
+              : syncing ? "Synchronizuję…" : hydrated ? "Zsynchronizowano" : "Wczytuję…"}
+            </span>
+            {(pendingCount > 0 || saveError) && (
+              <button type="button" className="text-button" disabled={syncing} onClick={() => void synchronizePending()}>
+                Spróbuj teraz
+              </button>
+            )}
+          </div>
         </div>
 
         {view === "review" && (
@@ -987,7 +947,7 @@ export default function Home() {
             <section className="review-section" aria-labelledby="review-title">
               <div className="section-heading">
                 <div>
-                  <h2 id="review-title">Do przejrzenia</h2>
+                  <h1 id="review-title">Do przejrzenia</h1>
                 </div>
                 {activeThoughts.length > 0 && (
                   <span className="soft-count">
@@ -1061,7 +1021,7 @@ export default function Home() {
                   <h3>Głowa może odpocząć.</h3>
                   <p>
                     Nie ma tu jeszcze żadnych myśli do przejrzenia. Możesz
-                    zostawić pierwszą powyżej.
+                    dodać pierwszą przyciskiem +.
                   </p>
                 </div>
               )}
@@ -1132,10 +1092,7 @@ export default function Home() {
                 title="Poczekalnia jest pusta."
                 copy="Każda nowa myśl pojawi się tutaj."
                 action="Zapisz pierwszą myśl"
-                onAction={() => {
-                  setView("review");
-                  setTimeout(() => inputRef.current?.focus(), 0);
-                }}
+                onAction={openCapture}
               />
             )}
           </section>
@@ -1216,6 +1173,64 @@ export default function Home() {
           </section>
         )}
       </main>
+
+      {captureOpen && (
+        <dialog
+          ref={captureDialogRef}
+          id="capture-dialog"
+          className="capture-dialog"
+          aria-labelledby="capture-title"
+          onClose={() => setCaptureOpen(false)}
+        >
+          <header className="capture-dialog-heading">
+            <div>
+              <p className="eyebrow">Nowa myśl</p>
+              <h2 id="capture-title">Co jeszcze chodzi Ci po głowie?</h2>
+            </div>
+            <button
+              type="button"
+              className="capture-close"
+              aria-label="Zamknij dodawanie"
+              onClick={() => captureDialogRef.current?.close()}
+            >
+              <span aria-hidden="true">×</span>
+            </button>
+          </header>
+          <form className="capture-form" onSubmit={submitThought}>
+            <div className="capture-row">
+              <div className="input-shell">
+                <input
+                  ref={inputRef}
+                  id="thought-input"
+                  value={draft}
+                  onInput={(event) => updateDraft(event.currentTarget.value)}
+                  maxLength={280}
+                  autoComplete="off"
+                  autoCapitalize="sentences"
+                  aria-label="Myśl do zapisania"
+                />
+                {draft.length === 0 && (
+                  <span className="rotating-placeholder" key={exampleIndex} aria-hidden="true">
+                    {THOUGHT_EXAMPLES[exampleIndex]}
+                  </span>
+                )}
+              </div>
+              <button type="submit" aria-label="Zapisz myśl" disabled={!draft.trim() || !hydrated}>
+                <span aria-hidden="true">+</span>
+                Zostaw tutaj
+              </button>
+            </div>
+          </form>
+          {storageError && <p role="alert">Nie udało się zapisać danych na tym urządzeniu. Zachowaj wpisaną treść i spróbuj ponownie.</p>}
+        </dialog>
+      )}
+
+      {addedFeedback && (
+        <div className="add-confirmation capture-confirmation" key={addedFeedback.id} role="status" aria-live="polite">
+          <span className="add-confirmation-mark" aria-hidden="true">✓</span>
+          <span><strong>Dodane do poczekalni</strong>{addedFeedback.text}</span>
+        </div>
+      )}
 
       {installation.help && (
         <InstallationHelp mode={installation.help} onClose={installation.closeHelp} />

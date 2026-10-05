@@ -7,7 +7,7 @@ const cookie = `${payload}.${createHmac("sha256", secret).update(payload).digest
 
 for (const colorScheme of ["light", "dark"] as const) {
   for (const mobile of [false, true]) {
-    test(`visual parity: ${colorScheme}, ${mobile ? "mobile" : "desktop"}`, async ({ page, context }) => {
+    test(`app views: ${colorScheme}, ${mobile ? "mobile" : "desktop"}`, async ({ page, context }) => {
       await page.setViewportSize(mobile ? { width: 390, height: 844 } : { width: 1440, height: 1000 });
       await page.emulateMedia({ colorScheme });
       await page.clock.setFixedTime(new Date("2026-10-03T12:00:00Z"));
@@ -36,6 +36,8 @@ test("login, capture, edit, defer, complete, undo, restore, delete and offline r
   await page.getByRole("button", { name: "Wejdź", exact: true }).click();
   await expect(page.getByText("Zsynchronizowano", { exact: true })).toBeVisible();
   const input = page.getByLabel("Myśl do zapisania");
+  await expect(input).toHaveCount(0);
+  await page.getByRole("button", { name: "Dodaj myśl", exact: true }).click();
   await input.fill("Test interakcji");
   await input.press("Enter");
   await expect(page.getByRole("button", { name: "Edytuj zadanie: Test interakcji", exact: true })).toBeVisible();
@@ -58,15 +60,22 @@ test("login, capture, edit, defer, complete, undo, restore, delete and offline r
   await expect(page.getByText("Zsynchronizowano", { exact: true })).toBeVisible();
 
   await context.setOffline(true);
+  await page.getByRole("button", { name: "Dodaj myśl", exact: true }).click();
   await input.fill("Myśl offline");
   await input.press("Enter");
+  await page.getByRole("button", { name: "Dodaj myśl", exact: true }).click();
   await input.fill("Szkic po odświeżeniu");
+  await page.keyboard.press("Escape");
   await expect(page.getByText(/Zapisane na tym urządzeniu/)).toBeVisible();
   const pending = await page.evaluate(() => Object.keys(localStorage).filter(k => k.startsWith("and-1-more-thing:outbox:v1:")));
   expect(pending).toHaveLength(1);
   await context.setOffline(false);
   await page.reload();
+  await expect(page.getByText("Zsynchronizowano", { exact: true })).toBeVisible();
+  await expect(input).toHaveCount(0);
+  await page.getByRole("button", { name: "Dodaj myśl", exact: true }).click();
   await expect(input).toHaveValue("Szkic po odświeżeniu");
+  await page.keyboard.press("Escape");
   await expect(page.getByText("Zsynchronizowano", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Edytuj zadanie: Myśl offline", exact: true })).toBeVisible();
   expect(await page.evaluate(() => Object.keys(localStorage).filter(k => k.startsWith("and-1-more-thing:outbox:v1:")))).toHaveLength(0);

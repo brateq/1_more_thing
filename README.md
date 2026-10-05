@@ -7,7 +7,10 @@ zbudowania frontendu i uruchamiania testów.
 
 ## Korzystanie
 
-- Dodawanie z każdego widoku, przyciskiem **+** lub skrótem **⌘K / Ctrl+K**.
+- Dodawanie w osobnym oknie z każdego widoku, przyciskiem **+** lub skrótem
+  **⌘K / Ctrl+K**. Po zapisaniu okno się zamyka; zamknięcie bez zapisu zachowuje szkic.
+- Domyślny widok pokazuje pięć najbliższych myśli w zwartej kolejce. Dłuższe
+  treści mają skrócony podgląd; kliknięcie otwiera pełną treść do edycji.
 - Edycja, odkładanie, załatwianie, cofanie, przywracanie i usuwanie myśli.
 - Widoki kolejki, wszystkich myśli, załatwionych i statystyk ostatnich 30 dni.
 - Automatyczny ciemny motyw, układ mobilny oraz ograniczenie animacji zgodne
@@ -187,10 +190,10 @@ npm run benchmark              # lokalny pomiar na osobnej bazie z 1000 wpisów
 
 Testy nie używają bazy produkcyjnej. Test zgodności tworzy bazę według
 oryginalnych migracji i potwierdzenia operacji według starego algorytmu Node.
-Obrazy referencyjne testów przeglądarkowych pochodzą z poprzedniej wersji
-aplikacji; obejmują logowanie i cztery widoki, jasny/ciemny motyw oraz mobile/desktop.
+Obrazy referencyjne testów przeglądarkowych obejmują logowanie i cztery widoki,
+jasny/ciemny motyw oraz mobile/desktop.
 Są zależne od systemu i wersji Chromium — na innym systemie wymagają ponownego
-porównania z oryginałem, a nie automatycznego zaakceptowania zmian wyglądu.
+sprawdzenia wyglądu przed zaakceptowaniem zmian.
 
 Benchmark raportuje lokalną przepustowość i p50/p95, bez gwarancji takich samych
 wyników na serwerze produkcyjnym. `BENCH_REQUESTS` i `BENCH_CONCURRENCY`

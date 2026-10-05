@@ -15,8 +15,10 @@ async function ready(page: Page) {
 }
 
 async function capture(page: Page, text: string) {
+  await page.getByRole("button", { name: "Dodaj myśl", exact: true }).click();
   await page.getByLabel("Myśl do zapisania").fill(text);
   await page.getByLabel("Myśl do zapisania").press("Enter");
+  await expect(page.getByRole("dialog")).toHaveCount(0);
 }
 
 async function showAll(page: Page) {
@@ -36,14 +38,21 @@ test("opens a new offline window, preserves edits and drafts, then clears pendin
   await page.getByLabel("Edytuj treść zadania").fill("Offline: poprawiona myśl");
   await page.getByLabel("Edytuj treść zadania").press("Enter");
   await capture(page, "Offline: zupełnie nowa myśl");
+  await page.getByRole("button", { name: "Dodaj myśl", exact: true }).click();
   await page.getByLabel("Myśl do zapisania").fill("Szkic zapisany offline");
+  await page.keyboard.press("Escape");
   await expect(pendingIcon(page)).toBeVisible();
   await expect.poll(() => outboxSize(page)).toBe(2);
   await page.close();
 
   const reopened = await context.newPage();
   await reopened.goto("/");
+  await expect(pendingIcon(reopened)).toBeVisible();
+  await expect(reopened.getByLabel("Myśl do zapisania")).toHaveCount(0);
+  await reopened.getByRole("button", { name: "Dodaj myśl", exact: true }).click();
+  await expect(reopened.getByLabel("Myśl do zapisania")).toBeFocused();
   await expect(reopened.getByLabel("Myśl do zapisania")).toHaveValue("Szkic zapisany offline");
+  await reopened.keyboard.press("Escape");
   await showAll(reopened);
   for (const text of ["Offline: poprawiona myśl", "Offline: zupełnie nowa myśl"]) {
     await expect(reopened.locator("article").filter({ hasText: text }).getByRole("img", { name: "Oczekuje na synchronizację" })).toBeVisible();
@@ -74,6 +83,7 @@ test("falls back to saved data when the server is unreachable despite an online 
   await expect(pendingIcon(page)).toBeVisible();
   await capture(page, "Offline: serwer niedostępny");
   await expect.poll(() => outboxSize(page)).toBe(1);
+  await expect(page.getByText("Zapisane na tym urządzeniu. Czeka na synchronizację: 1.", { exact: true })).toBeVisible();
   await context.unroute("**/api/**");
   await page.getByRole("button", { name: "Spróbuj teraz" }).click();
   await expect(page.getByText("Zsynchronizowano", { exact: true })).toBeVisible();
@@ -127,7 +137,8 @@ test("requires login after session expiry and keeps offline changes until reauth
   await page.reload();
   await expect(pendingIcon(page)).toBeVisible();
   await context.setOffline(false);
-  await expect(page.getByLabel("Hasło")).toBeVisible();
+  // Reconnecting immediately after an offline reload can use the 15-second retry.
+  await expect(page.getByLabel("Hasło")).toBeVisible({ timeout: 20_000 });
   expect(await outboxSize(page)).toBe(1);
   await context.setOffline(true);
   await page.reload();
