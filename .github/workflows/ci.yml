@@ -50,7 +50,13 @@ jobs:
         run: |
           rustup toolchain install 1.98.0 --profile minimal --component rustfmt --component clippy
           rustup override set 1.98.0
-      - run: npm ci
+      - name: Cache Rust dependencies and build outputs
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0
+        with:
+          shared-key: ci
+          cache-on-failure: true
+          save-if: ${{ github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+      - run: npm ci --no-audit --no-fund
       - run: npm audit --audit-level=low
       - run: npm run check
       - run: npm test
