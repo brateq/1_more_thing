@@ -18,7 +18,7 @@ concurrency:
 jobs:
   dependencies:
     name: Dependency vulnerabilities (npm and Cargo)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -36,7 +36,7 @@ jobs:
 
   application:
     name: Build, check and test
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -54,6 +54,6 @@ jobs:
       - run: npm audit --audit-level=low
       - run: npm run check
       - run: npm test
-      - run: npx --no-install playwright install --with-deps chromium
+      - run: npx --no-install playwright install --with-deps --only-shell chromium
       # Visual baselines are macOS-specific; exercise all functional browser tests on Linux.
       - run: npm run test:browser -- --grep-invert '^app views:'
