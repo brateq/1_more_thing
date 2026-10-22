@@ -179,6 +179,14 @@ można nadal wykonywać z Dokploy do S3, zatrzymując kontener na czas kopii.
 
 ## Weryfikacja
 
+GitHub Actions buduje aplikację, uruchamia kontrole kodu, testy HTTP i testy
+przeglądarkowe. Porównania obrazów pozostają lokalną kontrolą na macOS, skąd
+pochodzą pliki referencyjne. Osobne zadanie OSV-Scanner sprawdza rekurencyjnie
+lockfile npm i Cargo, także zależności developerskie, przy każdym PR, zmianie
+`main` i raz w tygodniu. Każda znana podatność powoduje błąd kontroli.
+Dependabot co tydzień proponuje aktualizacje npm, Cargo, obrazów Docker
+i akcji GitHub.
+
 ```bash
 npm test                       # build + HTTP, zgodność danych, kolejka offline
 npm run check                  # TypeScript, rustfmt, Clippy
