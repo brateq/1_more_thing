@@ -11,7 +11,7 @@ base64 = "0.22"
 chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
 dotenvy = "0.15"
 hex = "0.4"
-hmac = "0.12"
+hmac = "0.13"
 rand = "0.8"
 rusqlite = { version = "0.37", features = ["bundled"] }
 ryu-js = "1"
