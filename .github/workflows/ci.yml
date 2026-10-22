@@ -59,4 +59,4 @@ jobs:
         run: echo 'https://archive.ubuntu.com/ubuntu/' | sudo tee /etc/apt/apt-mirrors.txt
       - run: npx --no-install playwright install --with-deps --only-shell chromium
       # Visual baselines are macOS-specific; exercise all functional browser tests on Linux.
-      - run: npm run test:browser -- --grep-invert '^app views:'
+      - run: npm run test:browser -- --grep-invert 'app views:'
