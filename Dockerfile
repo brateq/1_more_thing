@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-FROM node:25-alpine AS frontend
+FROM node:24-alpine AS frontend
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN --mount=type=cache,target=/root/.npm npm ci
@@ -11,7 +11,7 @@ COPY scripts/compress.mjs ./scripts/compress.mjs
 COPY scripts/build-service-worker.mjs scripts/service-worker.js ./scripts/
 RUN npm run build:client
 
-FROM rust:1.95-bookworm AS backend
+FROM rust:1.98-bookworm AS backend
 WORKDIR /app
 COPY Cargo.toml Cargo.lock ./
 COPY src ./src

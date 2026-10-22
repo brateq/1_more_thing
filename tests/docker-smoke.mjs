@@ -54,7 +54,7 @@ try {
   const javascript = await fetch(url + asset, { headers: { "Accept-Encoding": "br" } });
   assert.equal(javascript.status, 200);
   assert.equal(javascript.headers.get("content-encoding"), "br");
-  assert.equal(javascript.headers.get("vary"), "Accept-Encoding");
+  assert.equal(javascript.headers.get("vary")?.toLowerCase(), "accept-encoding");
   docker(["restart", name]);
   await ready();
   const after = await (await fetch(`${url}/api/thoughts`, { headers })).json();

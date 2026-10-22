@@ -7,10 +7,18 @@ updates:
     groups:
       npm-dependencies:
         patterns: ["*"]
+    ignore:
+      # Keep Node's types on the LTS major used by CI and the frontend builder.
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: cargo
     directory: /
     schedule:
       interval: weekly
+    groups:
+      # These crates share the digest API and must be upgraded together.
+      hmac-sha2:
+        patterns: ["hmac", "sha2"]
   - package-ecosystem: github-actions
     directory: /
     schedule:
@@ -19,3 +27,6 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    ignore:
+      - dependency-name: "node"
+        update-types: ["version-update:semver-major"]

@@ -82,8 +82,8 @@ uruchom `node scripts/generate-pwa-icons.mjs` (wymagany Chromium Playwrighta).
 
 ## Uruchomienie lokalne
 
-Wymagania: Rust **1.95**, kompilator C (SQLite jest wbudowany w plik wykonywalny),
-Node.js **>=22.13.0** i npm.
+Wymagania: Rust **1.98**, kompilator C (SQLite jest wbudowany w plik wykonywalny),
+Node.js **>=22.13.0** i npm. CI i obraz budujący frontend używają Node.js **24 LTS**.
 
 ```bash
 npm ci
