@@ -125,14 +125,14 @@ test("serves compressed immutable assets, fresh HTML and JSON errors with correc
   const { url } = await startServer(t);
   const html = await fetch(url);
   assert.equal(html.headers.get("cache-control"), "no-cache");
-  assert.equal(html.headers.get("vary"), "Accept-Encoding");
+  assert.equal(html.headers.get("vary")?.toLowerCase(), "accept-encoding");
   const source = await html.text();
   const asset = source.match(/src="(\/assets\/[^\"]+\.js)"/)[1];
   for (const encoding of ["br", "gzip", "identity"]) {
     const response = await fetch(url + asset, { headers: { "Accept-Encoding": encoding } });
     assert.equal(response.status, 200);
     assert.match(response.headers.get("cache-control"), /immutable/);
-    assert.equal(response.headers.get("vary"), "Accept-Encoding");
+    assert.equal(response.headers.get("vary")?.toLowerCase(), "accept-encoding");
     assert.equal(response.headers.get("content-encoding"), encoding === "identity" ? null : encoding);
     assert.ok((await response.text()).length > 100);
   }

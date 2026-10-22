@@ -36,7 +36,8 @@ for (const colorScheme of ["light", "dark"] as const) {
         await expect(cards.nth(index).getByRole("button", { name: `Edytuj zadanie: ${tasks[index].text}`, exact: true })).toBeInViewport({ ratio: 1 });
         await expect(cards.nth(index).getByRole("button", { name: "Załatwione", exact: true })).toBeInViewport({ ratio: 1 });
       }
-      expect(await page.evaluate(() => ({
+      // Entry animations can temporarily extend the page before the layout settles.
+      await expect.poll(() => page.evaluate(() => ({
         vertical: document.documentElement.scrollHeight <= innerHeight,
         horizontal: document.documentElement.scrollWidth <= innerWidth,
       }))).toEqual({ vertical: true, horizontal: true });

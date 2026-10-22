@@ -1,7 +1,7 @@
 use axum::http::HeaderMap;
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
-use hmac::{Hmac, Mac};
-use rand::RngCore;
+use hmac::{Hmac, KeyInit, Mac};
+use rand::Rng;
 use scrypt::{Params, scrypt};
 use sha2::Sha256;
 use subtle::ConstantTimeEq;
@@ -101,7 +101,7 @@ pub fn verify_password(password: &str, stored: &str) -> bool {
 
 pub fn hash_password(password: &str) -> String {
     let mut salt = [0; 16];
-    rand::thread_rng().fill_bytes(&mut salt);
+    rand::rng().fill_bytes(&mut salt);
     let mut hash = [0; 64];
     scrypt(
         password.as_bytes(),

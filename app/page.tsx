@@ -6,7 +6,7 @@ import {
   useRef,
   useState,
 } from "preact/hooks";
-import type { JSX } from "preact";
+import type { TargetedEvent, TargetedKeyboardEvent, TargetedPointerEvent } from "preact";
 import { InstallationHelp, useAppInstallation } from "./install-app";
 import {
   applyOutbox, DRAFT_KEY, enqueueMutation, flushOutbox,
@@ -559,7 +559,7 @@ export default function Home() {
     } catch { setStorageError(true); }
   }
 
-  async function submitLogin(event: JSX.TargetedEvent<HTMLFormElement>) {
+  async function submitLogin(event: TargetedEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!loginPassword) return;
 
@@ -604,7 +604,7 @@ export default function Home() {
     }).catch(() => undefined);
   }
 
-  function submitThought(event: JSX.TargetedEvent<HTMLFormElement>) {
+  function submitThought(event: TargetedEvent<HTMLFormElement>) {
     event.preventDefault();
     const text = draft.trim();
     if (!text) {
@@ -680,7 +680,7 @@ export default function Home() {
     setEditingText("");
   }
 
-  function saveEdit(event: JSX.TargetedEvent<HTMLFormElement>, id: string) {
+  function saveEdit(event: TargetedEvent<HTMLFormElement>, id: string) {
     event.preventDefault();
     const text = editingText.trim();
     if (!text) return;
@@ -1350,7 +1350,7 @@ function QueueHistoryChart({
       ? activePoint.y - tooltipHeight - 16
       : activePoint.y + 16;
 
-  function selectClosestPoint(event: JSX.TargetedPointerEvent<SVGSVGElement>) {
+  function selectClosestPoint(event: TargetedPointerEvent<SVGSVGElement>) {
     const bounds = event.currentTarget.getBoundingClientRect();
     const pointerX =
       ((event.clientX - bounds.left) / Math.max(1, bounds.width)) * CHART_WIDTH;
@@ -1359,7 +1359,7 @@ function QueueHistoryChart({
     setSelectedIndex(Math.max(0, Math.min(data.length - 1, nextIndex)));
   }
 
-  function moveSelection(event: JSX.TargetedKeyboardEvent<SVGSVGElement>) {
+  function moveSelection(event: TargetedKeyboardEvent<SVGSVGElement>) {
     if (event.key === "ArrowLeft" || event.key === "ArrowDown") {
       event.preventDefault();
       setSelectedIndex((index) => Math.max(0, index - 1));
@@ -1500,7 +1500,7 @@ function LoginScreen({
   error: string;
   busy: boolean;
   onPasswordChange: (value: string) => void;
-  onSubmit: (event: JSX.TargetedEvent<HTMLFormElement>) => void;
+  onSubmit: (event: TargetedEvent<HTMLFormElement>) => void;
 }) {
   return (
     <main className="access-page">
