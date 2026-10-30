@@ -293,15 +293,22 @@ input:focus-visible {
   flex: 0 0 auto;
   width: 40px;
   height: 40px;
+  padding: 0;
   border: 0;
   border-radius: 11px;
+  display: grid;
+  place-items: center;
   background: var(--accent);
   color: var(--accent-ink);
   cursor: pointer;
-  font-size: 25px;
 }
 
 .quick-add-button:hover { background: var(--accent-hover); }
+
+.capture-icon {
+  display: block;
+  flex: 0 0 auto;
+}
 
 .app-status { margin-bottom: 24px; }
 
@@ -690,9 +697,9 @@ h1 {
   transform: translateY(-1px);
 }
 
-.capture-row button span {
-  font-size: 20px;
-  font-weight: 500;
+.capture-row .capture-icon {
+  width: 20px;
+  height: 20px;
 }
 
 .add-confirmation {

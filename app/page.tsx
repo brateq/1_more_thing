@@ -813,7 +813,7 @@ export default function Home() {
           disabled={!hydrated}
           onClick={openCapture}
         >
-          +
+          <CaptureIcon />
         </button>
         {installation.available && (
           <button className="install-button" type="button" onClick={() => void installation.install()}>
@@ -1216,7 +1216,7 @@ export default function Home() {
                 )}
               </div>
               <button type="submit" aria-label="Zapisz myśl" disabled={!draft.trim() || !hydrated}>
-                <span aria-hidden="true">+</span>
+                <CaptureIcon />
                 Zostaw tutaj
               </button>
             </div>
@@ -1277,6 +1277,25 @@ export default function Home() {
         </div>
       )}
     </div>
+  );
+}
+
+function CaptureIcon() {
+  return (
+    <svg
+      className="capture-icon"
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2"
+      stroke-linecap="round"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path d="M12 5v14M5 12h14" />
+    </svg>
   );
 }
 
