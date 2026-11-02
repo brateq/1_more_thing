@@ -11,7 +11,7 @@ COPY scripts/compress.mjs ./scripts/compress.mjs
 COPY scripts/build-service-worker.mjs scripts/service-worker.js ./scripts/
 RUN npm run build:client
 
-FROM rust:1.98-bookworm AS backend
+FROM rust:1.99-bookworm AS backend
 WORKDIR /app
 COPY Cargo.toml Cargo.lock ./
 COPY src ./src
