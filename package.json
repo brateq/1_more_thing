@@ -20,16 +20,16 @@
     "test:docker": "docker build -t and1:test . && node tests/docker-smoke.mjs"
   },
   "dependencies": {
-    "preact": "^11.0.1"
+    "preact": "^11.2.0"
   },
   "devDependencies": {
-    "@playwright/test": "^1.64.1",
+    "@playwright/test": "^1.65.0",
     "@preact/preset-vite": "^2.10.2",
-    "@tailwindcss/postcss": "4.3.3",
+    "@tailwindcss/postcss": "4.3.4",
     "@types/node": "24.19.2",
-    "tailwindcss": "4.3.3",
+    "tailwindcss": "4.3.4",
     "typescript": "7.0.2",
-    "vite": "8.3.5"
+    "vite": "8.3.6"
   },
   "type": "module"
 }
