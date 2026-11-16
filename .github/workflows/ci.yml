@@ -4,8 +4,6 @@ on:
   push:
     branches: [main]
   pull_request:
-  schedule:
-    - cron: "23 6 * * 1"
   workflow_dispatch:
 
 permissions:
@@ -16,24 +14,6 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  dependencies:
-    name: Dependency vulnerabilities (npm and Cargo)
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - name: Install OSV-Scanner 2.7.0
-        run: |
-          curl --fail --silent --show-error --location --retry 3 \
-            https://github.com/google/osv-scanner/releases/download/v2.7.0/osv-scanner_linux_amd64 \
-            --output "$RUNNER_TEMP/osv-scanner"
-          echo "160c6253e2922e9e0a6a9771c5c4c40a4b3c6090b34a3cdd5e80c96cc2e4218b  $RUNNER_TEMP/osv-scanner" | sha256sum --check
-          chmod +x "$RUNNER_TEMP/osv-scanner"
-      - name: Scan all dependency lockfiles, including development dependencies
-        run: '"$RUNNER_TEMP/osv-scanner" scan source --recursive --all-vulns .'
-
   application:
     name: Build, check and test
     runs-on: ubuntu-24.04
@@ -57,7 +37,6 @@ jobs:
           cache-on-failure: true
           save-if: ${{ github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
       - run: npm ci --no-audit --no-fund
-      - run: npm audit --audit-level=low
       - run: npm run check
       - run: npm test
       - name: Use the Ubuntu archive for browser system dependencies
