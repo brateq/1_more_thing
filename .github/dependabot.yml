@@ -3,50 +3,96 @@ updates:
   - package-ecosystem: npm
     directory: /
     schedule:
-      interval: weekly
+      interval: daily
+      time: 05:00
+      timezone: Europe/Warsaw
     groups:
       npm-dependencies:
         patterns: ["*"]
+      security-fixes:
+        applies-to: security-updates
+        patterns:
+          - "*"
     ignore:
       # Keep Node's types on the LTS major used by CI and the frontend builder.
       - dependency-name: "@types/node"
         update-types: ["version-update:semver-major"]
+    open-pull-requests-limit: 10
   - package-ecosystem: cargo
     directory: /
     schedule:
-      interval: weekly
+      interval: daily
+      time: 05:00
+      timezone: Europe/Warsaw
     groups:
       # These crates share the digest API and must be upgraded together.
       hmac-sha2:
         patterns: ["hmac", "sha2"]
       compatible-updates:
         patterns:
-          - '*'
+          - "*"
         update-types:
           - minor
           - patch
+      security-fixes:
+        applies-to: security-updates
+        patterns:
+          - "*"
+    open-pull-requests-limit: 10
   - package-ecosystem: github-actions
     directory: /
     schedule:
-      interval: weekly
+      interval: daily
+      time: 05:00
+      timezone: Europe/Warsaw
     groups:
       compatible-updates:
         patterns:
-          - '*'
+          - "*"
         update-types:
           - minor
           - patch
+      security-fixes:
+        applies-to: security-updates
+        patterns:
+          - "*"
+    open-pull-requests-limit: 10
   - package-ecosystem: docker
     directory: /
     schedule:
-      interval: weekly
+      interval: daily
+      time: 05:00
+      timezone: Europe/Warsaw
     ignore:
       - dependency-name: "node"
         update-types: ["version-update:semver-major"]
     groups:
       compatible-updates:
         patterns:
-          - '*'
+          - "*"
         update-types:
           - minor
           - patch
+      security-fixes:
+        applies-to: security-updates
+        patterns:
+          - "*"
+    open-pull-requests-limit: 10
+  - package-ecosystem: docker-compose
+    directory: /
+    schedule:
+      interval: daily
+      time: 05:00
+      timezone: Europe/Warsaw
+    open-pull-requests-limit: 10
+    groups:
+      compatible-updates:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
+      security-fixes:
+        applies-to: security-updates
+        patterns:
+          - "*"
